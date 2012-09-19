@@ -1,0 +1,4 @@
+.*.swp
+Makefile
+build*/
+*.pro.user
