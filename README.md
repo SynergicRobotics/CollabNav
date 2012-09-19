@@ -14,3 +14,6 @@
     cd build
     cmake -DCMAKE_BUILD_TYPE=Debug ..
     make
+
+## Code style
+We are going to use [ROS C++ Code Style](http://www.ros.org/wiki/CppStyleGuide).
