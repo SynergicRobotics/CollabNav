@@ -30,6 +30,114 @@
 
 #include <boost/thread.hpp>
 
+/*
+ * ### Summary
+ * 
+ * The main function of this class is laserCallback(). At first scan, initMapper() 
+ * is going to be called to initialize GMapping::GridSlamProcessor* gsp_ which 
+ * is the main guy of our algorithm. Then, addScan is going to be called to 
+ * process a scan. After that, updateMap() is called periodically to update the
+ * current map and also publish "map" and "map_metadata"
+ * 
+ * Apart from that, this class publishes "entropy" of weight of all particles, so
+ * we can observe the diveristy of weight.
+ *
+ *
+ * ## Publisher
+ *    -'entropy_publisher_' publishes "entropy"
+ *    -'sst_'               publishes "map"
+ *    -'sstm_'              publishes "map_metadata"
+ *
+ * ## Service Server
+ *    -'ss_'                subscribes "dynamic_map", call mapCallback() and 
+ *                          return nav_msgs::GetMap::Response map_, the map
+ *
+ * ## Subscriber
+ *    -'scan_filter_sub_'   subscribes "sensor_msgs::LaserScan"
+ *
+ * ## TF related    //TODO what are they?
+ *    -tf::TransformListener tf_
+ *    -tf::MessageFilter<sensor_msgs::LaserScan>* scan_filter_
+ *    -tf::TransformBroadcaster* tfB_
+ * 
+ * 
+ * ## Public Function Overview
+ * #  SlamGMapping() - setup
+ *      -initialize OpenSLAM GMapping stuff
+ *      -set parameters/threshold
+ *      -initial ROS publisher/service/subscriber
+ *      -set callback functions
+ * #  laserCallback() - process a scan
+ *      -it's a callback function for sensor_msgs::LaserScan
+ *      -call initMapper() if its the first scan
+ *      -call addScan() to process the scan
+ *      -call updateMap() to update the current map
+ * #  mapCallback() - reply the current map
+ *      -respond nav_msgs::GetMap::Response map_ when "dynamic_map" is received
+ * #  publishLoop() - loop for broadcasting tf forever 
+ *      -boost::thread* transform_thread_ is dedicate for this function
+ *      -call publishTransform() forever
+ * #  publishTransform()
+ *      -publish a map_to_odom transformation
+ * 
+ * 
+ * ## Private Function Overview
+ * #  initMapper() - fully init GMapping::GridSlamProcessor* gsp_
+ *      -get laser pose (I understand it as the orientation of laser)
+ *      -init GMapping::RangeSensor gsp_laser_
+ *      -init GMapping::SensorMap smap
+ *      -init GMapping::OdometrySensor gsp_odom_
+ *      -get initial pose of the robot
+ *      -further init GMapping::GridSlamProcessor* gsp_
+ * #  addScan() - process a scan
+ *      -call getOdomPose() // get robot pose at scan time
+ *      -pre-processing scan point (remove outliner)
+ *      -init GMapping::RangeReading reading
+ *      -reading.setPose(currentRobotPose)
+ *      -gsp_->processScan(reading)
+ * #  updateMap() - update current map
+ *      -init GMapping::ScanMatcher matcher
+ *      -get best particle GMapping::GridSlamProcessor::Particle best
+ *      -call computePoseEntropy()
+ *      -long code of matching new scan data
+ *      -expand map if needed
+ *      -sst_ publishes "map"
+ *      -sstm_ publishes "map_metadata"
+ * #  getOdomPose() - get robot pose at time t
+ *      get robot pose 'gmap_pose' at time t and return true
+ * #  computePoseEntropy() - calculate diversity of weight
+ *      calculate entropy of weight of all particles
+ * 
+ * 
+ * ## OpenSLAM
+ * This class is a ROS wrapper of real gmapping which is based on OpenSLAM.
+ * Anything from "GMapping" packages is from OpenSLAM which are
+ *  -GMapping::GridSlamProcessor* gsp_;
+ *  -GMapping::RangeSensor* gsp_laser_;
+ *  -GMapping::OdometrySensor* gsp_odom_;
+ *  -GMapping::ScanMatcher matcher;
+ *  -GMapping::ScanMatcherMap smap;
+ *  -GMapping::OrientedPoint              data structure for point with heading
+ *  -GMapping::SensorMap
+ *  -GMapping::sampleGaussian
+ *  -GMapping::RangeReading
+ *  //TODO read OpenSLAM
+ *    -"gmapping/gridfastslam/gridslamprocessor.h"
+ *    -"gmapping/sensor/sensor_base/sensor.h"
+ *    -"gmapping/sensor/sensor_range/rangesensor.h"
+ *    -"gmapping/sensor/sensor_odometry/odometrysensor.h"
+ * 
+ * 
+ * ## Future Works
+ *  -callback function for camera image message to detect the the other robot
+ *  -rendezvous
+ *    -after detect, we need to calculate other robot's pose and 'jump'
+ *    -function to exchange and process the observation; maybe define another 
+ *     type of message and another callback function
+ *    -after process all observation, we need to 'teleport' particles back
+ *  -we have to discuss where to put these changes; here or OpenSLAM code.
+ * 
+ */
 class SlamGMapping
 {
   public:
@@ -44,6 +152,7 @@ class SlamGMapping
     void publishLoop(double transform_publish_period);
 
   private:
+    // ROS stuff
     ros::NodeHandle node_;
     ros::Publisher entropy_publisher_;
     ros::Publisher sst_;
@@ -54,31 +163,33 @@ class SlamGMapping
     tf::MessageFilter<sensor_msgs::LaserScan>* scan_filter_;
     tf::TransformBroadcaster* tfB_;
 
+    // OpenSLAM GMapping stuff
     GMapping::GridSlamProcessor* gsp_;
     GMapping::RangeSensor* gsp_laser_;
+    GMapping::OdometrySensor* gsp_odom_;
     double gsp_laser_angle_increment_;
     unsigned int gsp_laser_beam_count_;
-    GMapping::OdometrySensor* gsp_odom_;
 
-    bool got_first_scan_;
+    bool got_first_scan_;   // becomes true after received the first scan and
+                            // mapper becomes fully initialized
 
-    bool got_map_;
+    bool got_map_;          // becomes true after updateMap() is called once
     nav_msgs::GetMap::Response map_;
 
-    ros::Duration map_update_interval_;
+    ros::Duration map_update_interval_; // update map every this duration
     tf::Transform map_to_odom_;
     boost::mutex map_to_odom_mutex_;
     boost::mutex map_mutex_;
 
-    int laser_count_;
-    int throttle_scans_;
+    int laser_count_;           // count the received scan
+    int throttle_scans_;        // can be set to skip some scans
 
-    boost::thread* transform_thread_;
+    boost::thread* transform_thread_; // call publishLoop()
 
-    std::string base_frame_;
-    std::string laser_frame_;
-    std::string map_frame_;
-    std::string odom_frame_;
+    std::string base_frame_;    // init as string of "base_link"
+    std::string laser_frame_;   // never used lol
+    std::string map_frame_;     // init as string of "map"
+    std::string odom_frame_;    // init as string of "odom"
 
     void updateMap(const sensor_msgs::LaserScan& scan);
     bool getOdomPose(GMapping::OrientedPoint& gmap_pose, const ros::Time& t);
