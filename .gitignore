@@ -1,5 +1,4 @@
 .*.swp
 *.*-swp
-Makefile
 build*/
 *.pro.user

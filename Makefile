@@ -1,4 +1,4 @@
-include $(shell rospack find mk)/cmake.mk
+include $(shell rospack find mk)/cmake_stack.mk
 
 distclean:
 # 	make clean
