@@ -1,7 +1,7 @@
 Background\ ColorB=0
 Background\ ColorG=0
 Background\ ColorR=0
-Camera\ Config=1.33279 3.1858 17.3091 3.68817 1.55131 -0.217874
+Camera\ Config=1.10279 3.1808 27.4934 4.95019 1.16228 0.430814
 Camera\ Type=rviz::OrbitViewController
 Fixed\ Frame=/map
 Grid.Alpha=0.5
@@ -19,6 +19,35 @@ Grid.OffsetZ=0
 Grid.Plane=0
 Grid.Plane\ Cell\ Count=25
 Grid.Reference\ Frame=/map
+LaserScan..AxisColorAutocompute\ Value\ Bounds=1
+LaserScan..AxisColorAxis=2
+LaserScan..AxisColorMax\ Value=10
+LaserScan..AxisColorMin\ Value=-10
+LaserScan..AxisColorUse\ Fixed\ Frame=1
+LaserScan..FlatColorColorB=0
+LaserScan..FlatColorColorG=0
+LaserScan..FlatColorColorR=1
+LaserScan..IntensityAutocompute\ Intensity\ Bounds=1
+LaserScan..IntensityChannel\ Name=intensity
+LaserScan..IntensityMax\ ColorB=1
+LaserScan..IntensityMax\ ColorG=1
+LaserScan..IntensityMax\ ColorR=1
+LaserScan..IntensityMax\ Intensity=4096
+LaserScan..IntensityMin\ ColorB=0
+LaserScan..IntensityMin\ ColorG=0
+LaserScan..IntensityMin\ ColorR=0
+LaserScan..IntensityMin\ Intensity=0
+LaserScan..IntensityUse\ full\ RGB\ spectrum=0
+LaserScan.Alpha=1
+LaserScan.Billboard\ Size=0.05
+LaserScan.Color\ Transformer=FlatColor
+LaserScan.Decay\ Time=0
+LaserScan.Enabled=1
+LaserScan.Position\ Transformer=XYZ
+LaserScan.Queue\ Size=10
+LaserScan.Selectable=1
+LaserScan.Style=0
+LaserScan.Topic=/scan
 Map.Alpha=0.7
 Map.Draw\ Behind=1
 Map.Enabled=1
@@ -32,9 +61,9 @@ Odometry.Keep=4
 Odometry.Length=0.7
 Odometry.Position\ Tolerance=0.05
 Odometry.Topic=/odom
-Property\ Grid\ Splitter=530,76
-Property\ Grid\ State=expanded=.Global Options,Odometry.Enabled;splitterratio=0.5
-QMainWindow=000000ff00000000fd0000000300000000000001080000029efc0200000001fb000000100044006900730070006c006100790073010000002c0000029e000000db0100000500000001000001080000029efc0200000003fb0000001e0054006f006f006c002000500072006f0070006500720074006900650073010000002c000000b90000006801000005fb0000000a0056006900650077007301000000e800000126000000a801000005fb0000001200530065006c0065006300740069006f006e0100000211000000b9000000680100000500000003000005390000003efc0100000001fb0000000800540069006d00650100000000000005390000023d01000005000003230000029e00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+Property\ Grid\ Splitter=584,76
+Property\ Grid\ State=;splitterratio=0.5
+QMainWindow=000000ff00000000fd000000030000000000000108000002d4fc0200000001fb000000100044006900730070006c006100790073010000002c000002d4000000db010000050000000100000108000002d4fc0200000003fb0000001e0054006f006f006c002000500072006f0070006500720074006900650073010000002c000000c90000006801000005fb0000000a0056006900650077007301000000f80000013c000000a801000005fb0000001200530065006c0065006300740069006f006e0100000237000000c9000000680100000500000003000005450000003efc0100000001fb0000000800540069006d00650100000000000005450000023d010000050000032f000002d400000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
 TF.All\ Enabled=0
 TF.Enabled=1
 TF.Frame\ Timeout=15
@@ -43,24 +72,27 @@ TF.Show\ Arrows=1
 TF.Show\ Axes=1
 TF.Show\ Names=1
 TF.Update\ Interval=0
-Target\ Frame=<Fixed Frame>
+Target\ Frame=/map
 Tool\ 2D\ Nav\ GoalTopic=/move_base_simple/goal
 Tool\ 2D\ Pose\ EstimateTopic=initialpose
 [Display0]
+ClassName=rviz::LaserScanDisplay
+Name=LaserScan
+[Display1]
 ClassName=rviz::MapDisplay
 Name=Map
-[Display1]
+[Display2]
 ClassName=rviz::GridDisplay
 Name=Grid
-[Display2]
+[Display3]
 ClassName=rviz::OdometryDisplay
 Name=Odometry
-[Display3]
+[Display4]
 ClassName=rviz::TFDisplay
 Name=TF
 [TF.Frames.]
-base_footprint.Enabled=0
-base_link.Enabled=1
+base_footprint.Enabled=1
+base_link.Enabled=0
 front_wheel_link.Enabled=0
 gyro_link.Enabled=0
 kinect_depth_frame.Enabled=0
@@ -73,8 +105,7 @@ left_cliff_sensor_link.Enabled=0
 left_wheel_link.Enabled=0
 leftfront_cliff_sensor_link.Enabled=0
 map.Enabled=1
-odom.Enabled=0
-odom_new.Enabled=1
+odom.Enabled=1
 plate_0_link.Enabled=0
 plate_1_link.Enabled=0
 plate_2_link.Enabled=0
@@ -103,7 +134,7 @@ standoff_kinect_0_link.Enabled=0
 standoff_kinect_1_link.Enabled=0
 wall_sensor_link.Enabled=0
 [Window]
-Height=806
-Width=1343
-X=71
-Y=-16
+Height=860
+Width=1355
+X=82
+Y=-72
