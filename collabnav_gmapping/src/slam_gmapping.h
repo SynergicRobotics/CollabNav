@@ -17,9 +17,14 @@
 /* Author: Brian Gerkey */
 
 #include "ros/ros.h"
+#include "rosbag/bag.h"
+#include "rosbag/view.h"
+#include "rosbag/player.h"
 #include "sensor_msgs/LaserScan.h"
 #include "std_msgs/Float64.h"
 #include "nav_msgs/GetMap.h"
+#include "nav_msgs/Odometry.h"
+#include "rosgraph_msgs/Clock.h"
 #include "tf/transform_listener.h"
 #include "tf/transform_broadcaster.h"
 #include "message_filters/subscriber.h"
@@ -29,6 +34,9 @@
 #include "gmapping/sensor/sensor_base/sensor.h"
 
 #include <boost/thread.hpp>
+#include <boost/foreach.hpp>
+
+#define foreach BOOST_FOREACH
 
 /*
  * ### Summary
@@ -209,7 +217,7 @@ class SlamGMapping
     void updateMap(const sensor_msgs::LaserScan& scan);
     bool getOdomPose(GMapping::OrientedPoint& gmap_pose, const ros::Time& t);
     bool initMapper(const sensor_msgs::LaserScan& scan);
-    bool addScan(const sensor_msgs::LaserScan& scan, GMapping::OrientedPoint& gmap_pose);
+    bool addScan(const sensor_msgs::LaserScan& scan, const GMapping::OrientedPoint& gmap_pose);
     double computePoseEntropy();
     
     // Parameters used by GMapping

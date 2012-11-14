@@ -400,7 +400,7 @@ SlamGMapping::initMapper(const sensor_msgs::LaserScan& scan)
 }
 
 bool
-SlamGMapping::addScan(const sensor_msgs::LaserScan& scan, GMapping::OrientedPoint& gmap_pose)
+SlamGMapping::addScan(const sensor_msgs::LaserScan& scan, const GMapping::OrientedPoint& gmap_pose)
 { 
   if(scan.ranges.size() != gsp_laser_beam_count_)
     return false;
@@ -675,45 +675,22 @@ void SlamGMapping::publishTransform()
 
 void SlamGMapping::virtualLaserCallback(const Record& teammate_record)
 {
+  static ros::Time last_map_update(0,0);
+  
   // We can't initialize the mapper until we've got the first scan
-//   GMapping::OrientedPoint odom_pose;
-//   if(addVirtualScan(*scan, odom_pose))
-//   {
-//     ROS_DEBUG("scan processed");
-// 
-//     GMapping::OrientedPoint mpose = gsp_->getParticles()[gsp_->getBestParticleIndex()].pose;
-//     ROS_DEBUG("new best pose: %.3f %.3f %.3f", mpose.x, mpose.y, mpose.theta);
-//     ROS_DEBUG("odom pose: %.3f %.3f %.3f", odom_pose.x, odom_pose.y, odom_pose.theta);
-//     ROS_DEBUG("correction: %.3f %.3f %.3f", mpose.x - odom_pose.x, mpose.y - odom_pose.y, mpose.theta - odom_pose.theta);
-// 
-//     // Save the current measurements and best position 
-//     
-//     records_.push_back(Record(mpose, *scan));
-//     
-//     tf::Stamped<tf::Pose> odom_to_map;
-//     try
-//     {
-//       tf_.transformPose(odom_frame_,tf::Stamped<tf::Pose> (tf::Transform(tf::createQuaternionFromRPY(0, 0, mpose.theta),
-//                                                                     tf::Vector3(mpose.x, mpose.y, 0.0)).inverse(),
-//                                                                     scan->header.stamp, base_frame_),odom_to_map);
-//     }
-//     catch(tf::TransformException e){
-//       ROS_ERROR("Transform from base_link to odom failed\n");
-//       odom_to_map.setIdentity();
-//     }
-// 
-//     map_to_odom_mutex_.lock();
-//     map_to_odom_ = tf::Transform(tf::Quaternion( odom_to_map.getRotation() ),
-//                                  tf::Point(      odom_to_map.getOrigin() ) ).inverse();
-//     map_to_odom_mutex_.unlock();
-// 
-//     if(!got_map_ || (scan->header.stamp - last_map_update) > map_update_interval_)
-//     {
-//       updateMap(*scan);
-//       last_map_update = scan->header.stamp;
-//       ROS_DEBUG("Updated the map");
-//     }
-//   }
+  if(addScan(teammate_record.measurement_, teammate_record.odom_pose_))
+  {
+    ROS_DEBUG("virtual scan processed");
+
+    GMapping::OrientedPoint mpose = gsp_->getParticles()[gsp_->getBestParticleIndex()].pose;
+    ROS_DEBUG("new best pose: %.3f %.3f %.3f", mpose.x, mpose.y, mpose.theta);
+
+    // Reversed time!
+    if ((last_map_update - teammate_record.measurement_.header.stamp) > map_update_interval_) 
+    {
+      updateMap(teammate_record.measurement_);
+      last_map_update = teammate_record.measurement_.header.stamp;
+      ROS_DEBUG("Updated the map using virtual data");
+    } 
+  }
 }
-
-
