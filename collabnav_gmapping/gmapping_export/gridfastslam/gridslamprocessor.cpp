@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <utils/stat.h>
 #include "gridslamprocessor.h"
+#include <gsl/gsl_matrix_double.h>
 
 //#define MAP_CONSISTENCY_CHECK
 //#define GENERATE_TRAJECTORIES
@@ -509,7 +510,65 @@ void GridSlamProcessor::setMotionModelParameters
   void GridSlamProcessor::onResampleUpdate(){}
   void GridSlamProcessor::onOdometryUpdate(){}
 
+  gsl_matrix *
+  GridSlamProcessor::getDecomposedVariance( const double& range, const double& bearing,
+      const double& sigma_range, const double& sigma_bearing) {
+    /** Allocate GSL Matrix and assign values according to jump covariance
+     * (According to the Rendezvous paper) **/
+    gsl_matrix * P = gsl_matrix_alloc(3, 3);
+    gsl_matrix_set(P, 0, 0, pow(sigma_range*cos(bearing), 2) + pow(range*sigma_bearing*sin(bearing), 2));
+    gsl_matrix_set(P, 0, 1, 0.5*(pow(sigma_range,2) - pow(range*sigma_bearing, 2))*sin(2*bearing));
+    gsl_matrix_set(P, 0, 2, -range*pow(sigma_bearing, 2)*sin(bearing));
+    gsl_matrix_set(P, 1, 0, gsl_matrix_get(P, 0, 1));
+    gsl_matrix_set(P, 1, 1, pow(sigma_range*sin(bearing), 2) + pow(range*sigma_bearing*cos(bearing), 2));
+    gsl_matrix_set(P, 1, 2, range*pow(sigma_bearing, 2)*cos(bearing));
+    gsl_matrix_set(P, 2, 0, gsl_matrix_get(P, 0, 2));
+    gsl_matrix_set(P, 2, 1, gsl_matrix_get(P, 1, 2));
+    gsl_matrix_set(P, 2, 2, 2*pow(sigma_range, 2));
+    /** Perform Cholesky decomposition on the covariance matrix P. This
+     * overwrites the previous values of the matrix. Keep only the lower
+     * triangular part of this matrix, since the upper triangular part
+     * corresponds to the transpose of the same matrix (see gsl docs) **/
+    gsl_linalg_cholesky_decomp(P);
+    for (int i = 0; i < 3; ++i) {
+      for (int j = i + 1; j < 3; ++j) {
+	gsl_matrix_set(P, i, j, 0);
+      }
+    }
+    return P;
+  }
   
+  OrientedPoint drawFromMVGaussian (const OrientedPoint & mean, gsl_matrix * & decomposedVariance) {
+    OrientedPoint sample(mean);
+    double w1 = sampleGaussian(1);
+    double w2 = sampleGaussian(1);
+    double w3 = sampleGaussian(1);
+    P11 = gsl_matrix_get(decomposedVariance, 0, 0);
+    P21 = gsl_matrix_get(decomposedVariance, 0, 0);
+    P22 = gsl_matrix_get(decomposedVariance, 0, 0);
+    P31 = gsl_matrix_get(decomposedVariance, 0, 0);
+    P32 = gsl_matrix_get(decomposedVariance, 0, 0);
+    P33 = gsl_matrix_get(decomposedVariance, 0, 0);
+    sample.x += P11 * w1;
+    sample.y += P21 * w1 + P22* w2;
+    sample.theta += P31 * w1 + P32 * w2 + P33 * w3;
+    return sample;
+  }
+    
+  
+  void GridSlamProcessor::jump(const double & range, const double & bearing,
+      const double & otherRobotBearing, const double & varianceRange,
+      const double & varianceBearing) {
+    gsl_matrix * P = getDecomposedVariance(range, bearing, varianceRange, varianceBearing);
+    OrientedPoint mean;
+    for (ParticleVector::iterator it=m_particles.begin(); it!=m_particles.end(); it++){
+      OrientedPoint& pose(it->pose);
+      mean.x = pose.x + range*cos(bearing);
+      mean.y = pose.y + range*sin(bearing);
+      mean.theta = pose.theta + bearing - otherRobotBearing;
+      pose = drawFromMVGaussian(mean, P);      
+    }
+  }
 };// end namespace
 
 

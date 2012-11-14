@@ -242,6 +242,10 @@ namespace GMapping {
 		
     /**minimum score for considering the outcome of the scanmatching good*/
     PARAM_SET_GET(double, minimumScore, protected, public, public);
+    
+    /** Obtain Cholesky-decomposed variance to sample from multivariate gaussian */
+    void getDecomposedVariance(double** decomposedVariance, const double& range,
+	const double& bearing, const double& sigma_range, const double& sigma_bearing);
 
   protected:
     /**Copy constructor*/
