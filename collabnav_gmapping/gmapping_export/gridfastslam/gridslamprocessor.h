@@ -120,6 +120,9 @@ namespace GMapping {
 
       /** Entry to the trajectory tree */
       TNode* node; 
+      
+      //CollabNav
+      OrientedPoint poseAtRendezvous;
     };
 	
     
@@ -243,6 +246,9 @@ namespace GMapping {
     /**minimum score for considering the outcome of the scanmatching good*/
     PARAM_SET_GET(double, minimumScore, protected, public, public);
 
+    //CollabNav
+    void teleport();
+    
   protected:
     /**Copy constructor*/
     GridSlamProcessor(const GridSlamProcessor& gsp);
