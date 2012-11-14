@@ -509,7 +509,15 @@ void GridSlamProcessor::setMotionModelParameters
   void GridSlamProcessor::onResampleUpdate(){}
   void GridSlamProcessor::onOdometryUpdate(){}
 
-  
+  //CollabNav
+  void GridSlamProcessor::teleport(){
+    //move every particles back to its saved position at Rendezvous event
+    for (ParticleVector::iterator it=m_particles.begin(); it!=m_particles.end(); it++){
+      OrientedPoint& pose(it->pose);
+      pose=it->poseAtRendezvous;
+    }
+  }
+
 };// end namespace
 
 
