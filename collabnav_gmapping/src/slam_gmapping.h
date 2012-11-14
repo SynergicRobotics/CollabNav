@@ -138,6 +138,20 @@
  *  -we have to discuss where to put these changes; here or OpenSLAM code.
  * 
  */
+
+using namespace std;
+    
+class Record{
+  public:
+    Record(GMapping::OrientedPoint odom_pose, sensor_msgs::LaserScan measurement) {
+	odom_pose_ = odom_pose;
+	measurement_ = measurement;
+    }
+    sensor_msgs::LaserScan measurement_;
+    GMapping::OrientedPoint odom_pose_;
+};    
+
+
 class SlamGMapping
 {
   public:
@@ -150,7 +164,8 @@ class SlamGMapping
     bool mapCallback(nav_msgs::GetMap::Request  &req,
                      nav_msgs::GetMap::Response &res);
     void publishLoop(double transform_publish_period);
-
+    void virtualLaserCallback(const Record &teammate_record);
+    
   private:
     // ROS stuff
     ros::NodeHandle node_;
@@ -228,4 +243,7 @@ class SlamGMapping
     double llsamplestep_;
     double lasamplerange_;
     double lasamplestep_;
+    
+    // CollabNav    
+    vector<Record> records_;
 };
