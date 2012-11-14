@@ -17,11 +17,12 @@ It will be assume there is a [sandbox](http://www.ros.org/wiki/groovy/Installati
     1. roscore
     2. rosrun rviz rviz -d `rospack find collabnav_gmapping`/config/rviz_prepared_for_gmapping.vcg
     3. rosrun collabnav_gmapping slam_gmapping scan:=/scan _odom_frame:=/odom
-    4. rosbag play (bag_file_name)
+    4. rosbag play --clock (bag_file_name)
 
 or
 
-    roslaunch collabnav_gmapping gmapping_and_rviz.launch
+    1. roslaunch collabnav_gmapping gmapping_and_rviz.launch
+    2. rosbag play --clock (bag_file_name)
 
 ### How to clean the project?
     rosmake --target=clean CollabNav
