@@ -17,9 +17,14 @@
 /* Author: Brian Gerkey */
 
 #include "ros/ros.h"
+#include "rosbag/bag.h"
+#include "rosbag/view.h"
+#include "rosbag/player.h"
 #include "sensor_msgs/LaserScan.h"
 #include "std_msgs/Float64.h"
 #include "nav_msgs/GetMap.h"
+#include "nav_msgs/Odometry.h"
+#include "rosgraph_msgs/Clock.h"
 #include "tf/transform_listener.h"
 #include "tf/transform_broadcaster.h"
 #include "message_filters/subscriber.h"
@@ -29,6 +34,9 @@
 #include "gmapping/sensor/sensor_base/sensor.h"
 
 #include <boost/thread.hpp>
+#include <boost/foreach.hpp>
+
+#define foreach BOOST_FOREACH
 
 /*
  * ### Summary
@@ -138,6 +146,20 @@
  *  -we have to discuss where to put these changes; here or OpenSLAM code.
  * 
  */
+
+using namespace std;
+    
+class Record{
+  public:
+    Record(GMapping::OrientedPoint odom_pose, sensor_msgs::LaserScan measurement) {
+	odom_pose_ = odom_pose;
+	measurement_ = measurement;
+    }
+    sensor_msgs::LaserScan measurement_;
+    GMapping::OrientedPoint odom_pose_;
+};    
+
+
 class SlamGMapping
 {
   public:
@@ -150,7 +172,8 @@ class SlamGMapping
     bool mapCallback(nav_msgs::GetMap::Request  &req,
                      nav_msgs::GetMap::Response &res);
     void publishLoop(double transform_publish_period);
-
+    void virtualLaserCallback(const Record &teammate_record);
+    
   private:
     // ROS stuff
     ros::NodeHandle node_;
@@ -194,7 +217,7 @@ class SlamGMapping
     void updateMap(const sensor_msgs::LaserScan& scan);
     bool getOdomPose(GMapping::OrientedPoint& gmap_pose, const ros::Time& t);
     bool initMapper(const sensor_msgs::LaserScan& scan);
-    bool addScan(const sensor_msgs::LaserScan& scan, GMapping::OrientedPoint& gmap_pose);
+    bool addScan(const sensor_msgs::LaserScan& scan, const GMapping::OrientedPoint& gmap_pose);
     double computePoseEntropy();
     
     // Parameters used by GMapping
@@ -228,4 +251,7 @@ class SlamGMapping
     double llsamplestep_;
     double lasamplerange_;
     double lasamplestep_;
+    
+    // CollabNav    
+    vector<Record> records_;
 };

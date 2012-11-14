@@ -120,6 +120,9 @@ namespace GMapping {
 
       /** Entry to the trajectory tree */
       TNode* node; 
+      
+      //CollabNav
+      OrientedPoint poseAtRendezvous;
     };
 	
     
@@ -247,6 +250,9 @@ namespace GMapping {
     void getDecomposedVariance(double** decomposedVariance, const double& range,
 	const double& bearing, const double& sigma_range, const double& sigma_bearing);
 
+    //CollabNav
+    void teleport();
+    
   protected:
     /**Copy constructor*/
     GridSlamProcessor(const GridSlamProcessor& gsp);

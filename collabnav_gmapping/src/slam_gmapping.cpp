@@ -400,11 +400,8 @@ SlamGMapping::initMapper(const sensor_msgs::LaserScan& scan)
 }
 
 bool
-SlamGMapping::addScan(const sensor_msgs::LaserScan& scan, GMapping::OrientedPoint& gmap_pose)
-{
-  if(!getOdomPose(gmap_pose, scan.header.stamp))
-     return false;
-  
+SlamGMapping::addScan(const sensor_msgs::LaserScan& scan, const GMapping::OrientedPoint& gmap_pose)
+{ 
   if(scan.ranges.size() != gsp_laser_beam_count_)
     return false;
 
@@ -476,7 +473,7 @@ SlamGMapping::laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
   }
 
   GMapping::OrientedPoint odom_pose;
-  if(addScan(*scan, odom_pose))
+  if(getOdomPose(odom_pose, scan->header.stamp) && addScan(*scan, odom_pose))
   {
     ROS_DEBUG("scan processed");
 
@@ -485,6 +482,9 @@ SlamGMapping::laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
     ROS_DEBUG("odom pose: %.3f %.3f %.3f", odom_pose.x, odom_pose.y, odom_pose.theta);
     ROS_DEBUG("correction: %.3f %.3f %.3f", mpose.x - odom_pose.x, mpose.y - odom_pose.y, mpose.theta - odom_pose.theta);
 
+    // Save the current measurements and best position 
+    records_.push_back(Record(mpose, *scan));
+    
     tf::Stamped<tf::Pose> odom_to_map;
     try
     {
@@ -671,4 +671,26 @@ void SlamGMapping::publishTransform()
   ros::Time tf_expiration = ros::Time::now() + ros::Duration(0.05);
   tfB_->sendTransform( tf::StampedTransform (map_to_odom_, ros::Time::now(), map_frame_, odom_frame_));
   map_to_odom_mutex_.unlock();
+}
+
+void SlamGMapping::virtualLaserCallback(const Record& teammate_record)
+{
+  static ros::Time last_map_update(0,0);
+  
+  // We can't initialize the mapper until we've got the first scan
+  if(addScan(teammate_record.measurement_, teammate_record.odom_pose_))
+  {
+    ROS_DEBUG("virtual scan processed");
+
+    GMapping::OrientedPoint mpose = gsp_->getParticles()[gsp_->getBestParticleIndex()].pose;
+    ROS_DEBUG("new best pose: %.3f %.3f %.3f", mpose.x, mpose.y, mpose.theta);
+
+    // Reversed time!
+    if ((last_map_update - teammate_record.measurement_.header.stamp) > map_update_interval_) 
+    {
+      updateMap(teammate_record.measurement_);
+      last_map_update = teammate_record.measurement_.header.stamp;
+      ROS_DEBUG("Updated the map using virtual data");
+    } 
+  }
 }
