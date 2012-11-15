@@ -11,7 +11,7 @@ SUBDIRS=utils sensor log configfile scanmatcher gridfastslam
 endif
 endif
 
-LDFLAGS+=
+LDFLAGS+= -lgsl -lgslcblas
 CPPFLAGS+= -I../sensor
 
 -include ./build_tools/Makefile.subdirs

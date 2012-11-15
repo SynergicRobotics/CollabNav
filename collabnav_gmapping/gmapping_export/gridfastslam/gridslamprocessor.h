@@ -14,6 +14,8 @@
 #include <sensor/sensor_range/rangereading.h>
 #include <scanmatcher/scanmatcher.h>
 #include "motionmodel.h"
+#include "gsl/gsl_matrix_double.h"
+#include "gsl/gsl_linalg.h"
 
 
 namespace GMapping {
@@ -246,11 +248,9 @@ namespace GMapping {
     /**minimum score for considering the outcome of the scanmatching good*/
     PARAM_SET_GET(double, minimumScore, protected, public, public);
     
-    /** Obtain Cholesky-decomposed variance to sample from multivariate gaussian */
-    void getDecomposedVariance(double** decomposedVariance, const double& range,
-	const double& bearing, const double& sigma_range, const double& sigma_bearing);
-
     //CollabNav
+    /** move the robot to the other robot position to begin the Rendezvous event */
+    void jump(double range, double bearing, double otherRobotBearing, double varianceRange, double varianceBearing);
     void teleport();
     
   protected:
@@ -337,6 +337,10 @@ namespace GMapping {
     void resetTree();
     double propagateWeights();
     
+    //CollabNav
+    /** Obtain Cholesky-decomposed variance to sample from multivariate gaussian */
+    gsl_matrix* getDecomposedVariance(double range, double bearing, double sigma_range, double sigma_bearing);
+    OrientedPoint drawFromMVGaussian (const OrientedPoint& mean, gsl_matrix* decomposedVariance);
   };
 
 typedef std::multimap<const GridSlamProcessor::TNode*, GridSlamProcessor::TNode*> TNodeMultimap;
