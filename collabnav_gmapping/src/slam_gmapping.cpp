@@ -227,6 +227,8 @@ SlamGMapping::SlamGMapping():
   scan_filter_->registerCallback(boost::bind(&SlamGMapping::laserCallback, this, _1));
 
   transform_thread_ = new boost::thread(boost::bind(&SlamGMapping::publishLoop, this, transform_publish_period));
+  test_thread_ = new boost::thread(boost::bind(&SlamGMapping::test, this, 0.0));
+//   out_.open("records.txt", fstream::out);
 }
 
 void SlamGMapping::publishLoop(double transform_publish_period){
@@ -256,6 +258,8 @@ SlamGMapping::~SlamGMapping()
     delete scan_filter_;
   if (scan_filter_sub_)
     delete scan_filter_sub_;
+  
+  out_.close();
 }
 
 bool
@@ -484,7 +488,7 @@ SlamGMapping::laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
 
     // Save the current measurements and best position 
     records_.push_back(Record(mpose, *scan));
-    
+//     Record(mpose, *scan).serialize(out_);
     tf::Stamped<tf::Pose> odom_to_map;
     try
     {
@@ -686,11 +690,32 @@ void SlamGMapping::virtualLaserCallback(const Record& teammate_record)
     ROS_DEBUG("new best pose: %.3f %.3f %.3f", mpose.x, mpose.y, mpose.theta);
 
     // Reversed time!
-    if ((last_map_update - teammate_record.measurement_.header.stamp) > map_update_interval_) 
+    //if ((teammate_record.measurement_.header.stamp - last_map_update) > map_update_interval_) 
     {
       updateMap(teammate_record.measurement_);
       last_map_update = teammate_record.measurement_.header.stamp;
-      ROS_DEBUG("Updated the map using virtual data");
+      ROS_WARN("Updated the map using virtual data");
     } 
   }
 }
+
+void SlamGMapping::test(double arg)
+{
+  //IMPORTANT: CHANGE THIS LINE
+  system("rosbag play --clock --hz 10 /home/ozan/Desktop/Bags/shorts/rosbag_0.bag");
+  cout << "Sleep for 3 seconds" << endl;
+  sleep(3);
+  cout << "Starting virtual calls" << endl;
+  
+  in_.open("records.txt", ifstream::in);
+  
+  while (!in_.eof()) {
+    Record r;
+    r.deserialize(in_);
+    virtualLaserCallback(r);
+  }
+  
+  cout << "Virtual navigation has ended" << endl;
+}
+
+

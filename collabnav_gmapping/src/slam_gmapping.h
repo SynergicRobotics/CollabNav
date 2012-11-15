@@ -28,6 +28,7 @@
 #include "tf/transform_listener.h"
 #include "tf/transform_broadcaster.h"
 #include "message_filters/subscriber.h"
+#include <opencv2/core/types_c.h>
 #include "tf/message_filter.h"
 
 #include "gmapping/gridfastslam/gridslamprocessor.h"
@@ -35,6 +36,8 @@
 
 #include <boost/thread.hpp>
 #include <boost/foreach.hpp>
+
+#include <fstream>
 
 #define foreach BOOST_FOREACH
 
@@ -151,10 +154,82 @@ using namespace std;
     
 class Record{
   public:
-    Record(GMapping::OrientedPoint odom_pose, sensor_msgs::LaserScan measurement) {
-	odom_pose_ = odom_pose;
-	measurement_ = measurement;
+    Record() {
+      
     }
+    
+    Record(GMapping::OrientedPoint odom_pose, sensor_msgs::LaserScan measurement) {
+      odom_pose_ = odom_pose;
+      measurement_ = measurement;
+    }
+    
+    void serialize(ofstream &file) {
+      // First pose
+      
+      file << odom_pose_.x << " " << odom_pose_.y << " " << odom_pose_.theta << endl;
+      file << measurement_.angle_increment << " " << measurement_.angle_max << " " << measurement_.angle_min << endl;
+      file << measurement_.header.frame_id << " " << measurement_.header.seq << " " << measurement_.header.stamp.toNSec() << endl;
+      
+      file << measurement_.intensities.size() << endl;
+      
+      int size = measurement_.intensities.size();
+      for (int i = 0; i < size; ++i) {
+        file << measurement_.intensities.at(i) << " ";
+      }
+      
+      file << endl;
+      
+      file << measurement_.range_max << " " << measurement_.range_min << endl;
+      file << measurement_.ranges.size() << endl;
+      
+      int rangesSize = measurement_.ranges.size();
+      for (int i = 0; i < rangesSize; ++i) {
+        file << measurement_.ranges.at(i) << " ";
+      }
+      file << endl;
+      
+      file << measurement_.scan_time << " " << measurement_.time_increment << endl << "end" << endl;
+      
+    }
+    
+    void deserialize(ifstream &file) {
+      
+      uint64_t nsecs;
+      
+      cout << "DESERIALIZING" << endl;
+      file >> odom_pose_.x >> odom_pose_.y >> odom_pose_.theta;
+      file >> measurement_.angle_increment >> measurement_.angle_max >> measurement_.angle_min;
+      cout << "TIME" << endl;
+      file >> measurement_.header.frame_id >> measurement_.header.seq >> nsecs;
+      cout << nsecs << endl;
+      measurement_.header.stamp.fromNSec(nsecs);
+      cout << "DONE" << endl;
+      int size;
+      file >> size;
+      for (int i = 0; i < size; ++i) {
+        float intensity;
+        file >> intensity;
+        measurement_.intensities.push_back(intensity);
+      }
+
+      file >> measurement_.range_max >> measurement_.range_min;
+      int rangeSize;
+      file >> rangeSize;
+      for (int i = 0; i < rangeSize; ++i) {
+        float range;
+        file >> range;
+        measurement_.ranges.push_back(range);
+      }
+
+      file >> measurement_.scan_time >> measurement_.time_increment;
+      string end;
+      file >> end;
+
+      if (end != "end")
+        ROS_WARN("SOMETHING WENT WRONG WITH FILE");
+    }
+    
+    
     sensor_msgs::LaserScan measurement_;
     GMapping::OrientedPoint odom_pose_;
 };    
@@ -254,4 +329,11 @@ class SlamGMapping
     
     // CollabNav    
     vector<Record> records_;
+    ros::Publisher rndvPublisher_;
+    ros::Subscriber rndvSubscriber_;
+    boost::thread* test_thread_;
+    void test(double arg);
+    
+    ofstream out_; 
+    ifstream in_;
 };
