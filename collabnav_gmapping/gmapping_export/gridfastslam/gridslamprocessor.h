@@ -16,6 +16,7 @@
 #include "motionmodel.h"
 #include "gsl/gsl_matrix_double.h"
 #include "gsl/gsl_linalg.h"
+#include <cmath>
 
 
 namespace GMapping {
@@ -341,6 +342,7 @@ namespace GMapping {
     /** Obtain Cholesky-decomposed variance to sample from multivariate gaussian */
     gsl_matrix* getDecomposedVariance(double range, double bearing, double sigma_range, double sigma_bearing);
     OrientedPoint drawFromMVGaussian (const OrientedPoint& mean, gsl_matrix* decomposedVariance);
+    void jump(double range, double bearing, double otherRobotBearing);
   };
 
 typedef std::multimap<const GridSlamProcessor::TNode*, GridSlamProcessor::TNode*> TNodeMultimap;

@@ -554,16 +554,20 @@ void GridSlamProcessor::setMotionModelParameters
     return sample;
   }    
   
-  void GridSlamProcessor::jump(double range, double bearing, double otherRobotBearing, 
-                               double varianceRange, double varianceBearing) {
+  void GridSlamProcessor::jump(double range, double bearing, double otherRobotBearing) {
+    // Wild guess here: Half the angular resolution of the Hokuyo Laser? If we don't have
+    // enough spread in the particles afterwards we can increase it.
+    double varianceBearing = 0.006283185307179587;
+    double varianceRange = 0.01*range; //cf. hokuyo documentation.
     gsl_matrix* P = getDecomposedVariance(range, bearing, varianceRange, varianceBearing);
     OrientedPoint mean;
     for (ParticleVector::iterator it=m_particles.begin(); it!=m_particles.end(); it++){
-      OrientedPoint& pose(it->pose);
-      mean.x = pose.x + range*cos(bearing);
-      mean.y = pose.y + range*sin(bearing);
-      mean.theta = pose.theta + bearing - otherRobotBearing;
-      pose = drawFromMVGaussian(mean, P);      
+      it->poseAtRendezvous = it->pose;
+      mean = OrientedPoint(it->pose);
+      mean.x += range*cos(bearing);
+      mean.y += range*sin(bearing);
+      mean.theta += M_PI + bearing - otherRobotBearing;
+      it->pose = drawFromMVGaussian(mean, P);      
     }
   }
 
