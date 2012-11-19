@@ -251,7 +251,7 @@ namespace GMapping {
     
     //CollabNav
     /** move the robot to the other robot position to begin the Rendezvous event */
-    void jump(double range, double bearing, double otherRobotBearing, double varianceRange, double varianceBearing);
+    void jump(double range, double bearing, double otherRobotBearing);
     void teleport();
     
   protected:
@@ -342,7 +342,6 @@ namespace GMapping {
     /** Obtain Cholesky-decomposed variance to sample from multivariate gaussian */
     gsl_matrix* getDecomposedVariance(double range, double bearing, double sigma_range, double sigma_bearing);
     OrientedPoint drawFromMVGaussian (const OrientedPoint& mean, gsl_matrix* decomposedVariance);
-    void jump(double range, double bearing, double otherRobotBearing);
   };
 
 typedef std::multimap<const GridSlamProcessor::TNode*, GridSlamProcessor::TNode*> TNodeMultimap;

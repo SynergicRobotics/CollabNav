@@ -38,6 +38,7 @@
 #include <boost/foreach.hpp>
 
 #include <fstream>
+#include <cmath>
 
 #define foreach BOOST_FOREACH
 
@@ -66,7 +67,7 @@
  * ## Subscriber
  *    -'scan_filter_sub_'   subscribes "sensor_msgs::LaserScan"
  *
- * ## TF related    //TODO what are they?
+ * ## TF related
  *    -tf::TransformListener tf_
  *    -tf::MessageFilter<sensor_msgs::LaserScan>* scan_filter_
  *    -tf::TransformBroadcaster* tfB_
@@ -132,7 +133,7 @@
  *  -GMapping::SensorMap
  *  -GMapping::sampleGaussian
  *  -GMapping::RangeReading
- *  //TODO read OpenSLAM
+ *  -OpenSLAM
  *    -"gmapping/gridfastslam/gridslamprocessor.h"
  *    -"gmapping/sensor/sensor_base/sensor.h"
  *    -"gmapping/sensor/sensor_range/rangesensor.h"
@@ -151,7 +152,8 @@
  */
 
 using namespace std;
-    
+   
+//CollabNav
 class Record{
   public:
     Record() {
@@ -168,7 +170,7 @@ class Record{
       
       file << odom_pose_.x << " " << odom_pose_.y << " " << odom_pose_.theta << endl;
       file << measurement_.angle_increment << " " << measurement_.angle_max << " " << measurement_.angle_min << endl;
-      file << measurement_.header.frame_id << " " << measurement_.header.seq << " " << measurement_.header.stamp.toNSec() << endl;
+      file << measurement_.header.frame_id << " " << measurement_.header.seq << " " << measurement_.header.stamp.sec << " " << measurement_.header.stamp.nsec << endl;
       
       file << measurement_.intensities.size() << endl;
       
@@ -194,16 +196,17 @@ class Record{
     
     void deserialize(ifstream &file) {
       
-      uint64_t nsecs;
+      uint32_t nsecs;
+      uint32_t secs;
       
       cout << "DESERIALIZING" << endl;
       file >> odom_pose_.x >> odom_pose_.y >> odom_pose_.theta;
       file >> measurement_.angle_increment >> measurement_.angle_max >> measurement_.angle_min;
-      cout << "TIME" << endl;
-      file >> measurement_.header.frame_id >> measurement_.header.seq >> nsecs;
-      cout << nsecs << endl;
-      measurement_.header.stamp.fromNSec(nsecs);
-      cout << "DONE" << endl;
+      file >> measurement_.header.frame_id >> measurement_.header.seq >> secs >> nsecs;
+      measurement_.header.stamp.sec = secs;
+      measurement_.header.stamp.nsec = nsecs;
+      
+      cout << secs << " " << nsecs << endl;
       int size;
       file >> size;
       for (int i = 0; i < size; ++i) {
@@ -332,6 +335,7 @@ class SlamGMapping
     ros::Publisher rndvPublisher_;
     ros::Subscriber rndvSubscriber_;
     boost::thread* test_thread_;
+    list<Record> virtualRecords_;
     void test(double arg);
     
     ofstream out_; 

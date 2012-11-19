@@ -701,21 +701,51 @@ void SlamGMapping::virtualLaserCallback(const Record& teammate_record)
 
 void SlamGMapping::test(double arg)
 {
-  //IMPORTANT: CHANGE THIS LINE
-  system("rosbag play --clock --hz 10 /home/ozan/Desktop/Bags/shorts/rosbag_0.bag");
-  cout << "Sleep for 3 seconds" << endl;
-  sleep(3);
-  cout << "Starting virtual calls" << endl;
+  //this is simulated information from robot sensor (not rendezvous)
+  //this call is blocking
+  cout << "Start physical navigation" << endl;
+  system("rosbag play --clock /home/big/Desktop/Bags/01.bag");
+  cout << "Physical navigation has ended" << endl;
   
+  /////////////////   the bag is finished. Now, we are going to begin rendezvous stuff   ////////////////
+  
+  //the rendezvous message, aka the pose and sensor information from other robot, will be read from text file
+  cout << "Start receiving Rendezvous Message" << endl;
   in_.open("records.txt", ifstream::in);
-  
   while (!in_.eof()) {
     Record r;
     r.deserialize(in_);
-    virtualLaserCallback(r);
+    r.measurement_.header.stamp = ros::Time::now();     //over write the timestamp
+    virtualRecords_.push_back(r);
+//     virtualLaserCallback(r);
+  }
+  //we received everything in reversed order
+//   virtualRecords_.reverse(); // it is reversed already!
+  cout << "Rendezvous Message has been received" << endl;
+  
+  //Now the first robot knows all the poses and measurements of the second robot
+  //we will move the robot to the other robot position
+  cout << "Start virtual navigation" << endl;
+  GMapping::OrientedPoint robotPose(4.88472, 4.50578, 0.00374148);
+  GMapping::OrientedPoint otherRobotPose(5.62567, 4.24709, -0.230034);
+  double dx = otherRobotPose.x - robotPose.x;
+  double dy = otherRobotPose.y - robotPose.y;
+  double range = sqrt(dx*dx + dy*dy);
+  double bearing = atan2(dy, dx) - robotPose.theta;
+  double otherRobotBearing = atan2(dy, dx) - otherRobotPose.theta;
+  cout << "  RANGE, BEARING, OTHERROBOTBEARING = " << range << " " << bearing << " " << otherRobotBearing << endl;
+  gsp_->jump(range, bearing, otherRobotBearing);        //RANGE, BEARING, OTHERROBOTBEARING = 0.78481 -0.339644 -0.105868
+  
+  //real virtual navigation starts here
+  for(list<Record>::iterator it = virtualRecords_.begin(); it != virtualRecords_.end(); ++it){
+    virtualLaserCallback(*it);
   }
   
+  //move the robot back to the real physical location
+  gsp_->teleport();
   cout << "Virtual navigation has ended" << endl;
+  
+  cout << endl << "  Complete Rendezvous Event!!" << endl << endl;
 }
 
 
