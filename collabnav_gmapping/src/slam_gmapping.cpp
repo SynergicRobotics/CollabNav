@@ -711,7 +711,7 @@ void SlamGMapping::test(double arg)
   
   //the rendezvous message, aka the pose and sensor information from other robot, will be read from text file
   cout << "Start receiving Rendezvous Message" << endl;
-  in_.open("records.txt", ifstream::in);
+  in_.open("../records.txt", ifstream::in);
   while (!in_.eof()) {
     Record r;
     r.deserialize(in_);
@@ -719,6 +719,7 @@ void SlamGMapping::test(double arg)
     virtualRecords_.push_back(r);
 //     virtualLaserCallback(r);
   }
+  virtualRecords_.pop_back(); // delete last elem. TODO: fix deserialize
   //we received everything in reversed order
 //   virtualRecords_.reverse(); // it is reversed already!
   cout << "Rendezvous Message has been received" << endl;
@@ -732,9 +733,13 @@ void SlamGMapping::test(double arg)
   double dy = otherRobotPose.y - robotPose.y;
   double range = sqrt(dx*dx + dy*dy);
   double bearing = atan2(dy, dx) - robotPose.theta;
-  double otherRobotBearing = atan2(dy, dx) - otherRobotPose.theta;
-  cout << "  RANGE, BEARING, OTHERROBOTBEARING = " << range << " " << bearing << " " << otherRobotBearing << endl;
-  gsp_->jump(range, bearing, otherRobotBearing);        //RANGE, BEARING, OTHERROBOTBEARING = 0.78481 -0.339644 -0.105868
+  double otherRobotBearing = atan2(-dy, -dx) - otherRobotPose.theta;
+//   cout << "  RANGE, BEARING, OTHERROBOTBEARING = " << range << " " << bearing << " " << otherRobotBearing << endl;
+  gsp_->save_particles("particleBeforeJump.txt");
+  cout << "Save particle" << endl;
+  gsp_->jump(range, bearing, otherRobotBearing);
+  gsp_->save_particles("particleAfterJump.txt");
+  cout << "Save particle" << endl;
   
   //real virtual navigation starts here
   for(list<Record>::iterator it = virtualRecords_.begin(); it != virtualRecords_.end(); ++it){

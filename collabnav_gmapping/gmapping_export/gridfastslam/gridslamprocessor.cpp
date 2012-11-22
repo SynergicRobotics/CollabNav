@@ -523,7 +523,7 @@ void GridSlamProcessor::setMotionModelParameters
     gsl_matrix_set(P, 1, 2, range*pow(sigma_bearing, 2)*cos(bearing));
     gsl_matrix_set(P, 2, 0, gsl_matrix_get(P, 0, 2));
     gsl_matrix_set(P, 2, 1, gsl_matrix_get(P, 1, 2));
-    gsl_matrix_set(P, 2, 2, 2*pow(sigma_range, 2));
+    gsl_matrix_set(P, 2, 2, 2*pow(sigma_bearing, 2));
     /** Perform Cholesky decomposition on the covariance matrix P. This
      * overwrites the previous values of the matrix. Keep only the lower
      * triangular part of this matrix, since the upper triangular part
@@ -543,11 +543,11 @@ void GridSlamProcessor::setMotionModelParameters
     double w2 = sampleGaussian(1);
     double w3 = sampleGaussian(1);
     double P11 = gsl_matrix_get(decomposedVariance, 0, 0);
-    double P21 = gsl_matrix_get(decomposedVariance, 0, 0);
-    double P22 = gsl_matrix_get(decomposedVariance, 0, 0);
-    double P31 = gsl_matrix_get(decomposedVariance, 0, 0);
-    double P32 = gsl_matrix_get(decomposedVariance, 0, 0);
-    double P33 = gsl_matrix_get(decomposedVariance, 0, 0);
+    double P21 = gsl_matrix_get(decomposedVariance, 1, 0);
+    double P22 = gsl_matrix_get(decomposedVariance, 1, 1);
+    double P31 = gsl_matrix_get(decomposedVariance, 2, 0);
+    double P32 = gsl_matrix_get(decomposedVariance, 2, 1);
+    double P33 = gsl_matrix_get(decomposedVariance, 2, 2);
     sample.x += P11 * w1;
     sample.y += P21 * w1 + P22* w2;
     sample.theta += P31 * w1 + P32 * w2 + P33 * w3;
@@ -557,8 +557,8 @@ void GridSlamProcessor::setMotionModelParameters
   void GridSlamProcessor::jump(double range, double bearing, double otherRobotBearing) {
     // Wild guess here: Half the angular resolution of the Hokuyo Laser? If we don't have
     // enough spread in the particles afterwards we can increase it.
-    double varianceBearing = 0.006283185307179587;
-    double varianceRange = 0.01*range; //cf. hokuyo documentation.
+    double varianceBearing = 0; //0.006283185307179587;
+    double varianceRange = 0; //0.01*range; //cf. hokuyo documentation.
     gsl_matrix* P = getDecomposedVariance(range, bearing, varianceRange, varianceBearing);
     OrientedPoint mean;
     for (ParticleVector::iterator it=m_particles.begin(); it!=m_particles.end(); it++){

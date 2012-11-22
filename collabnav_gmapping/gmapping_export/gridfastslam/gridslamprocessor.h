@@ -18,6 +18,11 @@
 #include "gsl/gsl_linalg.h"
 #include <cmath>
 
+#include <fstream>
+#include <iostream>
+
+using namespace std;
+
 
 namespace GMapping {
 
@@ -253,6 +258,18 @@ namespace GMapping {
     /** move the robot to the other robot position to begin the Rendezvous event */
     void jump(double range, double bearing, double otherRobotBearing);
     void teleport();
+    void save_particles(const string &filename)
+    {
+        ofstream out;
+        out.open(filename.c_str(), ofstream::out);
+        
+        out << m_particles.size() << endl;
+        for( int i=0; i < m_particles.size(); i++ )
+        {
+            out << m_particles[i].pose.x << " " << m_particles[i].pose.y << " " << m_particles[i].pose.theta << endl;
+        }
+        out.close();
+    }
     
   protected:
     /**Copy constructor*/
