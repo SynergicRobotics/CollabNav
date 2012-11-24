@@ -141,51 +141,51 @@ inline double ScanMatcher::icpStep(OrientedPoint & pret, const ScanMatcherMap& m
 }
 
 inline double ScanMatcher::score(const ScanMatcherMap& map, const OrientedPoint& p, const double* readings) const{
-	double s=0;
-	const double * angle=m_laserAngles+m_initialBeamsSkip;
-	OrientedPoint lp=p;
-	lp.x+=cos(p.theta)*m_laserPose.x-sin(p.theta)*m_laserPose.y;
-	lp.y+=sin(p.theta)*m_laserPose.x+cos(p.theta)*m_laserPose.y;
-	lp.theta+=m_laserPose.theta;
-	unsigned int skip=0;
-	double freeDelta=map.getDelta()*m_freeCellRatio;
-	for (const double* r=readings+m_initialBeamsSkip; r<readings+m_laserBeams; r++, angle++){
-		skip++;
-		skip=skip>m_likelihoodSkip?0:skip;
-		if (skip||*r>m_usableRange||*r==0.0) continue;
-		Point phit=lp;
-		phit.x+=*r*cos(lp.theta+*angle);
-		phit.y+=*r*sin(lp.theta+*angle);
-		IntPoint iphit=map.world2map(phit);
-		Point pfree=lp;
-		pfree.x+=(*r-map.getDelta()*freeDelta)*cos(lp.theta+*angle);
-		pfree.y+=(*r-map.getDelta()*freeDelta)*sin(lp.theta+*angle);
- 		pfree=pfree-phit;
-		IntPoint ipfree=map.world2map(pfree);
-		bool found=false;
-		Point bestMu(0.,0.);
-		for (int xx=-m_kernelSize; xx<=m_kernelSize; xx++)
-		for (int yy=-m_kernelSize; yy<=m_kernelSize; yy++){
-			IntPoint pr=iphit+IntPoint(xx,yy);
-			IntPoint pf=pr+ipfree;
-			//AccessibilityState s=map.storage().cellState(pr);
-			//if (s&Inside && s&Allocated){
-				const PointAccumulator& cell=map.cell(pr);
-				const PointAccumulator& fcell=map.cell(pf);
-				if (((double)cell )> m_fullnessThreshold && ((double)fcell )<m_fullnessThreshold){
-					Point mu=phit-cell.mean();
-					if (!found){
-						bestMu=mu;
-						found=true;
-					}else
-						bestMu=(mu*mu)<(bestMu*bestMu)?mu:bestMu;
-				}
-			//}
-		}
-		if (found)
-			s+=exp(-1./m_gaussianSigma*bestMu*bestMu);
-	}
-	return s;
+  double s=0;
+  const double * angle=m_laserAngles+m_initialBeamsSkip;
+  OrientedPoint lp=p;
+  lp.x+=cos ( p.theta ) *m_laserPose.x-sin ( p.theta ) *m_laserPose.y;
+  lp.y+=sin ( p.theta ) *m_laserPose.x+cos ( p.theta ) *m_laserPose.y;
+  lp.theta+=m_laserPose.theta;
+  unsigned int skip=0;
+  double freeDelta=map.getDelta() *m_freeCellRatio;
+  for ( const double* r=readings+m_initialBeamsSkip; r<readings+m_laserBeams; r++, angle++ ) {
+    skip++;
+    skip=skip>m_likelihoodSkip?0:skip;
+    if ( skip||*r>m_usableRange||*r==0.0 ) continue;
+    Point phit=lp;
+    phit.x+=*r*cos ( lp.theta+*angle );
+    phit.y+=*r*sin ( lp.theta+*angle );
+    IntPoint iphit=map.world2map ( phit );
+    Point pfree=lp;
+    pfree.x+= ( *r-map.getDelta() *freeDelta ) *cos ( lp.theta+*angle );
+    pfree.y+= ( *r-map.getDelta() *freeDelta ) *sin ( lp.theta+*angle );
+    pfree=pfree-phit;
+    IntPoint ipfree=map.world2map ( pfree );
+    bool found=false;
+    Point bestMu ( 0.,0. );
+    for ( int xx=-m_kernelSize; xx<=m_kernelSize; xx++ ) {
+      for ( int yy=-m_kernelSize; yy<=m_kernelSize; yy++ ) {
+        IntPoint pr=iphit+IntPoint ( xx,yy );
+        IntPoint pf=pr+ipfree;
+        //AccessibilityState s=map.storage().cellState(pr);
+        //if (s&Inside && s&Allocated){
+        const PointAccumulator& cell=map.cell ( pr );
+        const PointAccumulator& fcell=map.cell ( pf );
+        if ( ( ( double ) cell ) > m_fullnessThreshold && ( ( double ) fcell ) <m_fullnessThreshold ) {
+          Point mu=phit-cell.mean();
+          if ( !found ) {
+            bestMu=mu;
+            found=true;
+          } else
+            bestMu= ( mu*mu ) < ( bestMu*bestMu ) ?mu:bestMu;
+        }
+      }
+    }
+    if ( found )
+      s+=exp ( -1./m_gaussianSigma*bestMu*bestMu );
+  }
+  return s;
 }
 
 inline unsigned int ScanMatcher::likelihoodAndScore(double& s, double& l, const ScanMatcherMap& map, const OrientedPoint& p, const double* readings) const{
