@@ -28,7 +28,7 @@
 #include "tf/transform_listener.h"
 #include "tf/transform_broadcaster.h"
 #include "message_filters/subscriber.h"
-#include <opencv2/core/types_c.h>
+#include "geometry_msgs/PoseArray.h"
 #include "tf/message_filter.h"
 
 #include "gmapping/gridfastslam/gridslamprocessor.h"
@@ -245,13 +245,15 @@ class SlamGMapping
     ~SlamGMapping();
 
     void publishTransform();
-  
+
     void laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan);
     bool mapCallback(nav_msgs::GetMap::Request  &req,
                      nav_msgs::GetMap::Response &res);
     void publishLoop(double transform_publish_period);
     void virtualLaserCallback(const Record &teammate_record);
-    
+
+    void publishParticles(double arg =.0);
+
   private:
     // ROS stuff
     ros::NodeHandle node_;
@@ -263,6 +265,7 @@ class SlamGMapping
     message_filters::Subscriber<sensor_msgs::LaserScan>* scan_filter_sub_;
     tf::MessageFilter<sensor_msgs::LaserScan>* scan_filter_;
     tf::TransformBroadcaster* tfB_;
+    ros::Publisher particlecloud_pub_;
 
     // OpenSLAM GMapping stuff
     GMapping::GridSlamProcessor* gsp_;
