@@ -226,6 +226,8 @@ SlamGMapping::SlamGMapping():
   scan_filter_ = new tf::MessageFilter<sensor_msgs::LaserScan>(*scan_filter_sub_, tf_, odom_frame_, 5);
   scan_filter_->registerCallback(boost::bind(&SlamGMapping::laserCallback, this, _1));
 
+  particlecloud_pub_ = node_.advertise<geometry_msgs::PoseArray>("particlecloud", 2);
+
   transform_thread_ = new boost::thread(boost::bind(&SlamGMapping::publishLoop, this, transform_publish_period));
   test_thread_ = new boost::thread(boost::bind(&SlamGMapping::test, this, 0.0));
 //   out_.open("records.txt", fstream::out);
@@ -459,6 +461,27 @@ SlamGMapping::addScan(const sensor_msgs::LaserScan& scan, const GMapping::Orient
   return gsp_->processScan(reading);
 }
 
+void SlamGMapping::publishParticles(double arg)
+{
+    GMapping::GridSlamProcessor::ParticleVector particles = gsp_->getParticles();
+    int size = particles.size();
+
+    geometry_msgs::PoseArray cloud_msg;
+    cloud_msg.header.stamp = ros::Time::now();
+    cloud_msg.header.frame_id = map_frame_;
+    cloud_msg.poses.resize(size);
+
+    for( int i=0; i < size; i++ )
+    {
+        tf::poseTFToMsg(tf::Pose(tf::createQuaternionFromYaw(particles[i].pose.theta),
+                                 tf::Vector3( particles[i].pose.x,
+                                              particles[i].pose.y, 0) ),
+        cloud_msg.poses[i]);
+    }
+
+    particlecloud_pub_.publish(cloud_msg);
+}
+
 void
 SlamGMapping::laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
 {
@@ -480,8 +503,8 @@ SlamGMapping::laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
   if(getOdomPose(odom_pose, scan->header.stamp) && addScan(*scan, odom_pose))
   {
     ROS_DEBUG("scan processed");
-
     GMapping::OrientedPoint mpose = gsp_->getParticles()[gsp_->getBestParticleIndex()].pose;
+    
     ROS_DEBUG("new best pose: %.3f %.3f %.3f", mpose.x, mpose.y, mpose.theta);
     ROS_DEBUG("odom pose: %.3f %.3f %.3f", odom_pose.x, odom_pose.y, odom_pose.theta);
     ROS_DEBUG("correction: %.3f %.3f %.3f", mpose.x - odom_pose.x, mpose.y - odom_pose.y, mpose.theta - odom_pose.theta);
@@ -512,7 +535,10 @@ SlamGMapping::laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
       last_map_update = scan->header.stamp;
       ROS_DEBUG("Updated the map");
     }
+
+    publishParticles();
   }
+//   Record(mpose, *scan).serialize(out_);
 }
 
 double
@@ -704,12 +730,12 @@ void SlamGMapping::test(double arg)
   //this is simulated information from robot sensor (not rendezvous)
   //this call is blocking
   cout << "Start physical navigation" << endl;
-  system("rosbag play --clock /home/big/Desktop/Bags/01.bag");
+  system("rosbag play --clock /home/spe/fuerte_workspace/sandbox/CollabNav/Bags/01.bag");
   cout << "Physical navigation has ended" << endl;
   
-  /////////////////   the bag is finished. Now, we are going to begin rendezvous stuff   ////////////////
-  
-  //the rendezvous message, aka the pose and sensor information from other robot, will be read from text file
+//   /////////////////   the bag is finished. Now, we are going to begin rendezvous stuff   ////////////////
+//   
+//   //the rendezvous message, aka the pose and sensor information from other robot, will be read from text file
   cout << "Start receiving Rendezvous Message" << endl;
   in_.open("../records.txt", ifstream::in);
   while (!in_.eof()) {
@@ -717,9 +743,11 @@ void SlamGMapping::test(double arg)
     r.deserialize(in_);
     r.measurement_.header.stamp = ros::Time::now();     //over write the timestamp
     virtualRecords_.push_back(r);
+//     cout << "r.odom_pose_.x = " << r.odom_pose_.x << " r.odom_pose_.y = " << r.odom_pose_.y << endl;
 //     virtualLaserCallback(r);
   }
   virtualRecords_.pop_back(); // delete last elem. TODO: fix deserialize
+  
   //we received everything in reversed order
 //   virtualRecords_.reverse(); // it is reversed already!
   cout << "Rendezvous Message has been received" << endl;
@@ -727,19 +755,22 @@ void SlamGMapping::test(double arg)
   //Now the first robot knows all the poses and measurements of the second robot
   //we will move the robot to the other robot position
   cout << "Start virtual navigation" << endl;
-  GMapping::OrientedPoint robotPose(4.88472, 4.50578, 0.00374148);
-  GMapping::OrientedPoint otherRobotPose(5.62567, 4.24709, -0.230034);
-  double dx = otherRobotPose.x - robotPose.x;
-  double dy = otherRobotPose.y - robotPose.y;
-  double range = sqrt(dx*dx + dy*dy);
-  double bearing = atan2(dy, dx) - robotPose.theta;
-  double otherRobotBearing = atan2(-dy, -dx) - otherRobotPose.theta;
+//   GMapping::OrientedPoint robotPose(4.88472, 4.50578, 0.00374148);
+//   GMapping::OrientedPoint otherRobotPose(5.62567, 4.24709, -0.230034);
+//   double dx = otherRobotPose.x - robotPose.x;
+//   double dy = otherRobotPose.y - robotPose.y;
+//   double range = sqrt(dx*dx + dy*dy);
+//   double bearing = atan2(dy, dx) - robotPose.theta;
+//   double otherRobotBearing = atan2(-dy, -dx) - otherRobotPose.theta;
 //   cout << "  RANGE, BEARING, OTHERROBOTBEARING = " << range << " " << bearing << " " << otherRobotBearing << endl;
-  gsp_->save_particles("particleBeforeJump.txt");
-  cout << "Save particle" << endl;
-  gsp_->jump(range, bearing, otherRobotBearing);
-  gsp_->save_particles("particleAfterJump.txt");
-  cout << "Save particle" << endl;
+// //   gsp_->jump(range, bearing, otherRobotBearing);        //RANGE, BEARING, OTHERROBOTBEARING = 0.78481 -0.339644 -0.105868
+// 
+//   gsp_->save_particles("particleBeforeJump.txt");
+//   cout << "Save particle" << endl;
+//   gsp_->jump(range, bearing, otherRobotBearing);
+//   gsp_->save_particles("particleAfterJump.txt");
+//   cout << "Save particle" << endl;
+
   
   //real virtual navigation starts here
   for(list<Record>::iterator it = virtualRecords_.begin(); it != virtualRecords_.end(); ++it){
@@ -747,10 +778,12 @@ void SlamGMapping::test(double arg)
   }
   
   //move the robot back to the real physical location
-  gsp_->teleport();
+//   gsp_->teleport();
   cout << "Virtual navigation has ended" << endl;
   
   cout << endl << "  Complete Rendezvous Event!!" << endl << endl;
+
+  out_.close();
 }
 
 
