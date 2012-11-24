@@ -24,6 +24,11 @@
 #include <unistd.h>
 #include "gsp_thread.h"
 
+//CollabNav
+#include <omp.h>
+#include <iostream>
+using namespace std;
+
 using namespace GMapping;
 
 int  main (int argc, char ** argv){
@@ -47,6 +52,7 @@ int  main (int argc, char ** argv){
 	gsp->start();
 	cout <<"THREAD STARTED"<< endl;
 	bool done=false;
+  double time = omp_get_wtime();
 	while (!done){
 		GridSlamProcessorThread::EventDeque events=gsp->getEvents();
 		for (GridSlamProcessorThread::EventDeque::iterator it=events.begin(); it!=events.end(); it++){
@@ -61,4 +67,5 @@ int  main (int argc, char ** argv){
 				delete(*it);
 		}
 	}
+  cout << "Total Time: \t" << omp_get_wtime() - time << endl;
 }
