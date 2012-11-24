@@ -557,8 +557,9 @@ void GridSlamProcessor::setMotionModelParameters
   void GridSlamProcessor::jump(double range, double bearing, double otherRobotBearing) {
     // Wild guess here: Half the angular resolution of the Hokuyo Laser? If we don't have
     // enough spread in the particles afterwards we can increase it.
-    double varianceBearing = 0; //0.006283185307179587;
-    double varianceRange = 0; //0.01*range; //cf. hokuyo documentation.
+    cout << "Jumping now!" << endl;
+    double varianceBearing = 0.006283185307179587;
+    double varianceRange = 0.01*range; //cf. hokuyo documentation.
     gsl_matrix* P = getDecomposedVariance(range, bearing, varianceRange, varianceBearing);
     OrientedPoint mean;
     for (ParticleVector::iterator it=m_particles.begin(); it!=m_particles.end(); it++){
@@ -572,6 +573,7 @@ void GridSlamProcessor::setMotionModelParameters
   }
 
   void GridSlamProcessor::teleport(){
+    cout << "Teleporting now!" << endl;
     //move every particles back to its saved position at Rendezvous event
     for (ParticleVector::iterator it=m_particles.begin(); it!=m_particles.end(); it++){
       OrientedPoint& pose(it->pose);

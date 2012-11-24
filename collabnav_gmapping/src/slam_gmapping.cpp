@@ -735,11 +735,11 @@ void SlamGMapping::test(double arg)
   double bearing = atan2(dy, dx) - robotPose.theta;
   double otherRobotBearing = atan2(-dy, -dx) - otherRobotPose.theta;
 //   cout << "  RANGE, BEARING, OTHERROBOTBEARING = " << range << " " << bearing << " " << otherRobotBearing << endl;
-  gsp_->save_particles("particleBeforeJump.txt");
-  cout << "Save particle" << endl;
+//   gsp_->save_particles("particleBeforeJump.txt");
+//   cout << "Save particle" << endl;
   gsp_->jump(range, bearing, otherRobotBearing);
-  gsp_->save_particles("particleAfterJump.txt");
-  cout << "Save particle" << endl;
+//   gsp_->save_particles("particleAfterJump.txt");
+//   cout << "Save particle" << endl;
   
   //real virtual navigation starts here
   for(list<Record>::iterator it = virtualRecords_.begin(); it != virtualRecords_.end(); ++it){
