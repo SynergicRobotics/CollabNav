@@ -9,6 +9,9 @@
 #include <utils/gvalues.h>
 #define LASER_MAXBEAMS 2048
 
+//CollabNav
+#include <omp.h>
+
 namespace GMapping {
 
 class ScanMatcher{
@@ -17,9 +20,9 @@ class ScanMatcher{
 		
 		ScanMatcher();
 		~ScanMatcher();
-		double icpOptimize(OrientedPoint& pnew, const ScanMatcherMap& map, const OrientedPoint& p, const double* readings) const;
-		double optimize(OrientedPoint& pnew, const ScanMatcherMap& map, const OrientedPoint& p, const double* readings) const;
-		double optimize(OrientedPoint& mean, CovarianceMatrix& cov, const ScanMatcherMap& map, const OrientedPoint& p, const double* readings) const;
+		double icpOptimize(OrientedPoint& pnew, const ScanMatcherMap& map, const OrientedPoint& p, const double* readings);
+		double optimize(OrientedPoint& pnew, const ScanMatcherMap& map, const OrientedPoint& p, const double* readings);
+		double optimize(OrientedPoint& mean, CovarianceMatrix& cov, const ScanMatcherMap& map, const OrientedPoint& p, const double* readings);
 		
 		double   registerScan(ScanMatcherMap& map, const OrientedPoint& p, const double* readings);
 		void setLaserParameters
@@ -29,15 +32,17 @@ class ScanMatcher{
 		void invalidateActiveArea();
 		void computeActiveArea(ScanMatcherMap& map, const OrientedPoint& p, const double* readings);
 
-		inline double icpStep(OrientedPoint & pret, const ScanMatcherMap& map, const OrientedPoint& p, const double* readings) const;
-		inline double score(const ScanMatcherMap& map, const OrientedPoint& p, const double* readings) const;
-		inline unsigned int likelihoodAndScore(double& s, double& l, const ScanMatcherMap& map, const OrientedPoint& p, const double* readings) const;
+		inline double icpStep(OrientedPoint & pret, const ScanMatcherMap& map, const OrientedPoint& p, const double* readings);
+		double score(const ScanMatcherMap& map, const OrientedPoint& p, const double* readings);
+		inline unsigned int likelihoodAndScore(double& s, double& l, const ScanMatcherMap& map, const OrientedPoint& p, const double* readings);
 		double likelihood(double& lmax, OrientedPoint& mean, CovarianceMatrix& cov, const ScanMatcherMap& map, const OrientedPoint& p, const double* readings);
 		double likelihood(double& _lmax, OrientedPoint& _mean, CovarianceMatrix& _cov, const ScanMatcherMap& map, const OrientedPoint& p, Gaussian3& odometry, const double* readings, double gain=180.);
 		inline const double* laserAngles() const { return m_laserAngles; }
 		inline unsigned int laserBeams() const { return m_laserBeams; }
 		
 		static const double nullLikelihood;
+    
+    
 	protected:
 		//state of the matcher
 		bool m_activeAreaComputed;
@@ -46,6 +51,7 @@ class ScanMatcher{
 		unsigned int m_laserBeams;
 		double       m_laserAngles[LASER_MAXBEAMS];
 		
+    
 		//OrientedPoint m_laserPose;
 		PARAM_SET_GET(OrientedPoint, laserPose, protected, public, public)
 		PARAM_SET_GET(double, laserMaxRange, protected, public, public)
@@ -68,13 +74,14 @@ class ScanMatcher{
 		PARAM_SET_GET(double, angularOdometryReliability, protected, public, public)
 		PARAM_SET_GET(double, linearOdometryReliability, protected, public, public)
 		PARAM_SET_GET(double, freeCellRatio, protected, public, public)
-		PARAM_SET_GET(unsigned int, initialBeamsSkip, protected, public, public)
+    PARAM_SET_GET(unsigned int, initialBeamsSkip, protected, public, public)
+    PARAM_SET_GET(double, totalTime, protected, public, public)
 
 		// allocate this large array only once
 		IntPoint* m_linePoints;
 };
 
-inline double ScanMatcher::icpStep(OrientedPoint & pret, const ScanMatcherMap& map, const OrientedPoint& p, const double* readings) const{
+inline double ScanMatcher::icpStep(OrientedPoint & pret, const ScanMatcherMap& map, const OrientedPoint& p, const double* readings){
 	const double * angle=m_laserAngles+m_initialBeamsSkip;
 	OrientedPoint lp=p;
 	lp.x+=cos(p.theta)*m_laserPose.x-sin(p.theta)*m_laserPose.y;
@@ -140,78 +147,7 @@ inline double ScanMatcher::icpStep(OrientedPoint & pret, const ScanMatcherMap& m
 	return score(map, p, readings);
 }
 
-//CollabNav
-//TODO make sure that m_likelihoodSkip is not chagning over time, o/w its gonna break
-inline double ScanMatcher::score(const ScanMatcherMap& map, const OrientedPoint& p, const double* readings) const{
-  double s=0;
-  const double * angle=m_laserAngles+m_initialBeamsSkip;
-  OrientedPoint lp=p;
-  lp.x+=cos ( p.theta ) *m_laserPose.x-sin ( p.theta ) *m_laserPose.y;
-  lp.y+=sin ( p.theta ) *m_laserPose.x+cos ( p.theta ) *m_laserPose.y;
-  lp.theta+=m_laserPose.theta;
-  unsigned int skip=1;
-  double freeDelta=map.getDelta() *m_freeCellRatio;
-  
-  //CollabNav
-  const double* r;
-  Point phit;
-  IntPoint iphit;
-  Point pfree;
-  IntPoint ipfree;
-  bool found;
-  Point bestMu;
-  int xx;
-  int yy;
-  IntPoint pr;
-  IntPoint pf;
-  Point mu;
-  unsigned int i;
-  unsigned int maxI = m_laserBeams - m_initialBeamsSkip;
-#pragma omp parallel for num_threads(2) default(none) schedule(static) \
-  private(r, angle, skip, phit, iphit, pfree, ipfree, found, bestMu, xx, yy, pr, pf, mu, i) \
-  shared(readings, lp, map, freeDelta, maxI) \
-  reduction(+:s)
-  for ( i=0; i<maxI; ++i ) {
-    r = readings+m_initialBeamsSkip+i;
-    angle = m_laserAngles+m_initialBeamsSkip+i;
-    skip = skip+i;
-    if ( *r==0.0||*r>m_usableRange||skip%(m_likelihoodSkip+1) ) continue;
-    phit=lp;
-    phit.x+=*r*cos ( lp.theta+*angle );
-    phit.y+=*r*sin ( lp.theta+*angle );
-    iphit=map.world2map ( phit );
-    pfree=lp;
-    pfree.x+= ( *r-map.getDelta() *freeDelta ) *cos ( lp.theta+*angle );
-    pfree.y+= ( *r-map.getDelta() *freeDelta ) *sin ( lp.theta+*angle );
-    pfree=pfree-phit;
-    ipfree=map.world2map ( pfree );
-    found=false;
-    bestMu = Point( 0.,0. );
-    for ( xx=-m_kernelSize; xx<=m_kernelSize; ++xx ) {
-      for ( yy=-m_kernelSize; yy<=m_kernelSize; ++yy ) {
-        pr=iphit+IntPoint ( xx,yy );
-        pf=pr+ipfree;
-        //AccessibilityState s=map.storage().cellState(pr);
-        //if (s&Inside && s&Allocated){
-        const PointAccumulator& cell=map.cell ( pr );
-        const PointAccumulator& fcell=map.cell ( pf );
-        if ( ( ( double ) cell ) > m_fullnessThreshold && ( ( double ) fcell ) <m_fullnessThreshold ) {
-          mu=phit-cell.mean();
-          if ( !found ) {
-            bestMu=mu;
-            found=true;
-          } else
-            bestMu= ( mu*mu ) < ( bestMu*bestMu ) ?mu:bestMu;
-        }
-      }
-    }
-    if ( found )
-      s+=exp ( -1./m_gaussianSigma*bestMu*bestMu );
-  }
-  return s;
-}
-
-inline unsigned int ScanMatcher::likelihoodAndScore(double& s, double& l, const ScanMatcherMap& map, const OrientedPoint& p, const double* readings) const{
+inline unsigned int ScanMatcher::likelihoodAndScore(double& s, double& l, const ScanMatcherMap& map, const OrientedPoint& p, const double* readings){
 	using namespace std;
 	l=0;
 	s=0;

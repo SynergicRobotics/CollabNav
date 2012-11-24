@@ -67,5 +67,5 @@ int  main (int argc, char ** argv){
 				delete(*it);
 		}
 	}
-  cout << "Total Time: \t" << omp_get_wtime() - time << endl;
+  cout << "Total Score Time: \t" << gsp->m_matcher.gettotalTime() << endl;
 }

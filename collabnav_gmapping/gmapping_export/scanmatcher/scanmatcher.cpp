@@ -48,6 +48,8 @@ ScanMatcher::ScanMatcher(): m_laserPose(0,0,0){
 */
 
 	m_linePoints = new IntPoint[20000];
+  
+  m_totalTime = 0.0; //CollabNav
 }
 
 ScanMatcher::~ScanMatcher(){
@@ -314,7 +316,7 @@ void ScanMatcher::registerScan(ScanMatcherMap& map, const OrientedPoint& p, cons
 
 */
 
-double ScanMatcher::icpOptimize(OrientedPoint& pnew, const ScanMatcherMap& map, const OrientedPoint& init, const double* readings) const{
+double ScanMatcher::icpOptimize(OrientedPoint& pnew, const ScanMatcherMap& map, const OrientedPoint& init, const double* readings){
 	double currentScore;
 	double sc=score(map, init, readings);;
 	OrientedPoint start=init;
@@ -332,7 +334,7 @@ double ScanMatcher::icpOptimize(OrientedPoint& pnew, const ScanMatcherMap& map, 
 	return currentScore;
 }
 
-double ScanMatcher::optimize(OrientedPoint& pnew, const ScanMatcherMap& map, const OrientedPoint& init, const double* readings) const{
+double ScanMatcher::optimize(OrientedPoint& pnew, const ScanMatcherMap& map, const OrientedPoint& init, const double* readings){
 	double bestScore=-1;
 	OrientedPoint currentPose=init;
 	double currentScore=score(map, currentPose, readings);
@@ -425,7 +427,7 @@ struct ScoredMove{
 
 typedef std::list<ScoredMove> ScoredMoveList;
 
-double ScanMatcher::optimize(OrientedPoint& _mean, ScanMatcher::CovarianceMatrix& _cov, const ScanMatcherMap& map, const OrientedPoint& init, const double* readings) const{
+double ScanMatcher::optimize(OrientedPoint& _mean, ScanMatcher::CovarianceMatrix& _cov, const ScanMatcherMap& map, const OrientedPoint& init, const double* readings){
 	ScoredMoveList moveList;
 	double bestScore=-1;
 	OrientedPoint currentPose=init;
@@ -717,7 +719,81 @@ void ScanMatcher::setMatchingParameters
 	m_gaussianSigma=sigma;
 	m_likelihoodSigma=likelihoodSigma;
 	m_likelihoodSkip=likelihoodSkip;
+  m_totalTime = 0;
 }
+
+
+double ScanMatcher::score(const ScanMatcherMap& map, const OrientedPoint& p, const double* readings)
+{
+  double s=0;
+  const double * angle=m_laserAngles+m_initialBeamsSkip;
+  OrientedPoint lp=p;
+  lp.x+=cos ( p.theta ) *m_laserPose.x-sin ( p.theta ) *m_laserPose.y;
+  lp.y+=sin ( p.theta ) *m_laserPose.x+cos ( p.theta ) *m_laserPose.y;
+  lp.theta+=m_laserPose.theta;
+  unsigned int skip=1;
+  double freeDelta=map.getDelta() *m_freeCellRatio;
+  
+  const double* r;
+  Point phit;
+  IntPoint iphit;
+  Point pfree;
+  IntPoint ipfree;
+  bool found;
+  Point bestMu;
+  int xx;
+  int yy;
+  IntPoint pr;
+  IntPoint pf;
+  Point mu;
+  unsigned int i;
+  unsigned int maxI = m_laserBeams - m_initialBeamsSkip;
+  m_totalTime -= omp_get_wtime();
+#pragma omp parallel for num_threads(2) default(none) schedule(static) \
+  private(r, angle, skip, phit, iphit, pfree, ipfree, found, bestMu, xx, yy, pr, pf, mu, i) \
+  shared(readings, lp, map, freeDelta, maxI) \
+  reduction(+:s)
+  for ( i=0; i<maxI; ++i ) {
+    r = readings+m_initialBeamsSkip+i;
+    angle = m_laserAngles+m_initialBeamsSkip+i;
+    skip = skip+i;
+    if ( *r==0.0||*r>m_usableRange||skip%(m_likelihoodSkip+1) ) continue;
+    phit=lp;
+    phit.x+=*r*cos ( lp.theta+*angle );
+    phit.y+=*r*sin ( lp.theta+*angle );
+    iphit=map.world2map ( phit );
+    pfree=lp;
+    pfree.x+= ( *r-map.getDelta() *freeDelta ) *cos ( lp.theta+*angle );
+    pfree.y+= ( *r-map.getDelta() *freeDelta ) *sin ( lp.theta+*angle );
+    pfree=pfree-phit;
+    ipfree=map.world2map ( pfree );
+    found=false;
+    bestMu = Point( 0.,0. );
+    for ( xx=-m_kernelSize; xx<=m_kernelSize; ++xx ) {
+      for ( yy=-m_kernelSize; yy<=m_kernelSize; ++yy ) {
+        pr=iphit+IntPoint ( xx,yy );
+        pf=pr+ipfree;
+        //AccessibilityState s=map.storage().cellState(pr);
+        //if (s&Inside && s&Allocated){
+        const PointAccumulator& cell=map.cell ( pr );
+        const PointAccumulator& fcell=map.cell ( pf );
+        if ( ( ( double ) cell ) > m_fullnessThreshold && ( ( double ) fcell ) <m_fullnessThreshold ) {
+          mu=phit-cell.mean();
+          if ( !found ) {
+            bestMu=mu;
+            found=true;
+          } else
+            bestMu= ( mu*mu ) < ( bestMu*bestMu ) ?mu:bestMu;
+        }
+      }
+    }
+    if ( found )
+      s+=exp ( -1./m_gaussianSigma*bestMu*bestMu );
+  }
+  m_totalTime += omp_get_wtime();
+  return s;
+}
+
 
 };
 
