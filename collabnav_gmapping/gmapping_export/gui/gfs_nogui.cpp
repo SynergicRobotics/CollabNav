@@ -42,17 +42,21 @@ int  main (int argc, char ** argv){
 		cout << "GSP INIT ERROR" << endl;
 		return -1;
 	}
-	cout <<"GSP INITIALIZED"<< endl;
+// 	cout <<"GSP INITIALIZED"<< endl;
 	if (gsp->loadFiles()){
 		cout <<"GSP READFILE ERROR"<< endl;
 		return -2;
 	}
-	cout <<"FILES LOADED"<< endl;
+// 	cout <<"FILES LOADED"<< endl;
 	gsp->setMapUpdateTime(1000000);
 	gsp->start();
-	cout <<"THREAD STARTED"<< endl;
+// 	cout <<"THREAD STARTED"<< endl;
 	bool done=false;
-  double time = omp_get_wtime();
+
+//     cout << "  Number of processors available = " << omp_get_num_procs ( ) << "\n";
+//     cout << "  Number of threads =              " << omp_get_max_threads ( ) << "\n";
+
+    double time = 0;
 	while (!done){
 		GridSlamProcessorThread::EventDeque events=gsp->getEvents();
 		for (GridSlamProcessorThread::EventDeque::iterator it=events.begin(); it!=events.end(); it++){
@@ -60,12 +64,17 @@ int  main (int argc, char ** argv){
 			GridSlamProcessorThread::DoneEvent* doneEvent=dynamic_cast<GridSlamProcessorThread::DoneEvent*>(*it);
 			if (doneEvent){
 				done=true;
-				cout <<"DONE!"<< endl;
+// 				cout <<"DONE!"<< endl;
 				gsp->stop();
 			}
 			if (*it)
 				delete(*it);
 		}
 	}
-  cout << "Total Score Time: \t" << gsp->m_matcher.gettotalTime() << endl;
+
+//     cout << "Number of processors available = " << omp_get_num_procs ( ) << "\n";
+//     cout << "Number of threads =              " << omp_get_max_threads ( ) << "\n";
+    cout << gsp->m_matcher.gettotalTime() << " ";
+//     cout << "time_threads_" << omp_get_max_threads() << " = [ ";
+
 }

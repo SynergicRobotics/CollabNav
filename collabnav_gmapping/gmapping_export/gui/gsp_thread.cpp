@@ -178,7 +178,7 @@ int GridSlamProcessorThread::loadFiles(const char * fn){
 	if (! readFromStdin){
 		plainStream.open(filename.c_str());
 		input=new InputSensorStream(sensorMap, plainStream);
-		cout << "Plain Stream opened="<< (bool) plainStream << endl;
+// 		cout << "Plain Stream opened="<< (bool) plainStream << endl;
 	} else {
 		input=new InputSensorStream(sensorMap, cin);
 		cout << "Plain Stream opened on stdin" << endl;

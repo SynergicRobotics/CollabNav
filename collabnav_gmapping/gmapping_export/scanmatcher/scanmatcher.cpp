@@ -749,7 +749,7 @@ double ScanMatcher::score(const ScanMatcherMap& map, const OrientedPoint& p, con
   unsigned int i;
   unsigned int maxI = m_laserBeams - m_initialBeamsSkip;
   m_totalTime -= omp_get_wtime();
-#pragma omp parallel for num_threads(2) default(none) schedule(static) \
+#pragma omp parallel for default(none) schedule(static) \
   private(r, angle, skip, phit, iphit, pfree, ipfree, found, bestMu, xx, yy, pr, pf, mu, i) \
   shared(readings, lp, map, freeDelta, maxI) \
   reduction(+:s)
