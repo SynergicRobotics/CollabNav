@@ -725,38 +725,10 @@ void SlamGMapping::virtualLaserCallback(const Record& teammate_record)
   }
 }
 
-void SlamGMapping::test(double arg)
+void SlamGMapping::rendezvous(const GMapping::OrientedPoint &robotPose,
+                              const GMapping::OrientedPoint &otherRobotPose,
+                              const list<Record> &records)
 {
-  //this is simulated information from robot sensor (not rendezvous)
-  //this call is blocking
-  cout << "Start physical navigation" << endl;
-  system("rosbag play --clock /home/spe/fuerte_workspace/sandbox/CollabNav/Bags/01.bag");
-  cout << "Physical navigation has ended" << endl;
-  
-//   /////////////////   the bag is finished. Now, we are going to begin rendezvous stuff   ////////////////
-//   
-//   //the rendezvous message, aka the pose and sensor information from other robot, will be read from text file
-  cout << "Start receiving Rendezvous Message" << endl;
-  in_.open("../records.txt", ifstream::in);
-  while (!in_.eof()) {
-    Record r;
-    r.deserialize(in_);
-    r.measurement_.header.stamp = ros::Time::now();     //over write the timestamp
-    virtualRecords_.push_back(r);
-//     cout << "r.odom_pose_.x = " << r.odom_pose_.x << " r.odom_pose_.y = " << r.odom_pose_.y << endl;
-//     virtualLaserCallback(r);
-  }
-  virtualRecords_.pop_back(); // delete last elem. TODO: fix deserialize
-  
-  //we received everything in reversed order
-//   virtualRecords_.reverse(); // it is reversed already!
-  cout << "Rendezvous Message has been received" << endl;
-  
-  //Now the first robot knows all the poses and measurements of the second robot
-  //we will move the robot to the other robot position
-  cout << "Start virtual navigation" << endl;
-  GMapping::OrientedPoint robotPose(4.88472, 4.50578, 0.00374148);
-  GMapping::OrientedPoint otherRobotPose(5.62567, 4.24709, -0.230034);
   double dx = otherRobotPose.x - robotPose.x;
   double dy = otherRobotPose.y - robotPose.y;
   double range = sqrt(dx*dx + dy*dy);
@@ -768,19 +740,50 @@ void SlamGMapping::test(double arg)
   gsp_->jump(range, bearing, otherRobotBearing);
 //   gsp_->save_particles("particleAfterJump.txt");
 //   cout << "Save particle" << endl;
-  
+
   //real virtual navigation starts here
-  for(list<Record>::iterator it = virtualRecords_.begin(); it != virtualRecords_.end(); ++it){
+  for(list<Record>::const_iterator it = records.begin(); it != records.end(); ++it){
     virtualLaserCallback(*it);
   }
-  
+
   //move the robot back to the real physical location
 //   gsp_->teleport();
   cout << "Virtual navigation has ended" << endl;
-  
-  cout << endl << "  Complete Rendezvous Event!!" << endl << endl;
-
-  out_.close();
+  cout << "\n  Complete Rendezvous Event!!" << endl << endl;
 }
 
 
+void SlamGMapping::readRecords(const string &filename, list<Record> &records)
+{
+  ifstream in;
+
+  in.open(filename.c_str(), ifstream::in);
+  while (!in.eof()) {
+    Record r;
+    r.deserialize(in);
+    r.measurement_.header.stamp = ros::Time::now();     //over write the timestamp
+    records.push_back(r);
+  }
+  records.pop_back();    // delete last elem. TODO: fix deserialize
+}
+
+void SlamGMapping::test(double arg)
+{
+  //this is simulated information from robot sensor (not rendezvous)
+  //this call is blocking
+  cout << "Start physical navigation" << endl;
+  system("rosbag play --clock ../01.bag");
+  cout << "Physical navigation has ended" << endl;
+
+  tf::Quaternion orientation01(-0.00625073, 0.00978491, 0.042442, 0.999031);
+  tf::Quaternion orientation02(-0.00872674, 0.00993745, -0.0376415, 0.999204);
+  GMapping::OrientedPoint robotPose01(0.27107, 2.35659, tf::getYaw(orientation01));
+  GMapping::OrientedPoint robotPose02(1.04821, 2.38144, tf::getYaw(orientation02));
+
+  list<Record> records02;
+  readRecords("../records_02_full.txt", records02);
+  rendezvous(robotPose01, robotPose02, records02);
+
+
+  out_.close();
+}

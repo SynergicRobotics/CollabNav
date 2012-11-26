@@ -254,6 +254,15 @@ class SlamGMapping
 
     void publishParticles(double arg =.0);
 
+    // Performs rendezvous event
+    void rendezvous(const GMapping::OrientedPoint &robotPose,
+                    const GMapping::OrientedPoint &otherRobotPose,
+                    const list<Record> &records);
+
+    // Read records from a file
+    void readRecords(const string &filename, list<Record> &records);
+
+
   private:
     // ROS stuff
     ros::NodeHandle node_;
