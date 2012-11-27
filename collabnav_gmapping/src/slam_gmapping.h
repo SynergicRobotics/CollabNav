@@ -253,6 +253,10 @@ class SlamGMapping
     void virtualLaserCallback(const Record &teammate_record);
 
     void publishParticles(double arg =.0);
+    
+    // Jump step
+    void jump(const GMapping::OrientedPoint &robotPose,
+              const GMapping::OrientedPoint &otherRobotPose);
 
     // Performs rendezvous event
     void rendezvous(const GMapping::OrientedPoint &robotPose,

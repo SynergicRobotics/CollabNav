@@ -554,6 +554,12 @@ void GridSlamProcessor::setMotionModelParameters
     return sample;
   }    
   
+  void GridSlamProcessor::savePoseAtRendezvous(double range, double bearing, double otherRobotBearing) {
+    for (ParticleVector::iterator it=m_particles.begin(); it!=m_particles.end(); it++){
+      it->poseAtRendezvous = it->pose;
+    }
+  }
+  
   void GridSlamProcessor::jump(double range, double bearing, double otherRobotBearing) {
     // Wild guess here: Half the angular resolution of the Hokuyo Laser? If we don't have
     // enough spread in the particles afterwards we can increase it.
@@ -568,7 +574,8 @@ void GridSlamProcessor::setMotionModelParameters
       mean.x += range*cos(bearing);
       mean.y += range*sin(bearing);
       mean.theta += M_PI + bearing - otherRobotBearing;
-      it->pose = drawFromMVGaussian(mean, P);      
+      it->pose = mean;
+//       it->pose = drawFromMVGaussian(mean, P);      
     }
   }
 

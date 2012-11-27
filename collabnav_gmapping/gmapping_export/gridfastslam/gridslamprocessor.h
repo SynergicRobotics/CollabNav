@@ -256,6 +256,7 @@ namespace GMapping {
     
     //CollabNav
     /** move the robot to the other robot position to begin the Rendezvous event */
+    void savePoseAtRendezvous(double range, double bearing, double otherRobotBearing);
     void jump(double range, double bearing, double otherRobotBearing);
     void teleport();
     void save_particles(const string &filename)
