@@ -240,6 +240,7 @@ void SlamGMapping::publishLoop(double transform_publish_period){
   ros::Rate r(1.0 / transform_publish_period);
   while(ros::ok()){
     publishTransform();
+    publishParticles();
     r.sleep();
   }
 }
@@ -535,8 +536,6 @@ SlamGMapping::laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
       last_map_update = scan->header.stamp;
       ROS_DEBUG("Updated the map");
     }
-
-    publishParticles();
   }
 //   Record(mpose, *scan).serialize(out_);
 }
