@@ -571,8 +571,8 @@ void GridSlamProcessor::setMotionModelParameters
     for (ParticleVector::iterator it=m_particles.begin(); it!=m_particles.end(); it++){
       it->poseAtRendezvous = it->pose;
       mean = OrientedPoint(it->pose);
-      mean.x += range*cos(bearing);
-      mean.y += range*sin(bearing);
+      mean.x += range*cos(bearing + mean.theta);
+      mean.y += range*sin(bearing + mean.theta);
       mean.theta += M_PI + bearing - otherRobotBearing;
       it->pose = mean;
 //       it->pose = drawFromMVGaussian(mean, P);      
