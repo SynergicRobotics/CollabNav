@@ -240,7 +240,6 @@ void SlamGMapping::publishLoop(double transform_publish_period){
   ros::Rate r(1.0 / transform_publish_period);
   while(ros::ok()){
     publishTransform();
-    publishParticles();
     r.sleep();
   }
 }
@@ -537,6 +536,7 @@ SlamGMapping::laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
       ROS_DEBUG("Updated the map");
     }
   }
+  publishParticles();
 //   Record(mpose, *scan).serialize(out_);
 }
 
@@ -721,9 +721,8 @@ void SlamGMapping::virtualLaserCallback(const Record& teammate_record)
       last_map_update = teammate_record.measurement_.header.stamp;
       ROS_WARN("Updated the map using virtual data");
     }
-    
-    publishParticles();
   }
+  publishParticles();
 }
 
 void SlamGMapping::jump(const GMapping::OrientedPoint &robotPose,
