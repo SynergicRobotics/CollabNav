@@ -3,10 +3,8 @@
 ## Description
 CollabNav is a stack that contains the gmapping package, which provides SLAM capabilities.
 
-### [Wiki](https://github.com/SynergicRobotics/CollabNav/wiki)
-  * Weekly [progress](https://github.com/SynergicRobotics/CollabNav/wiki/Progress)
-  * Information on [Gmapping](https://github.com/SynergicRobotics/CollabNav/wiki/Gmapping), the technique which we will use for our solution.
-  * Summary of the [Rendezvous](https://github.com/SynergicRobotics/CollabNav/wiki/Rendezvous-approach) paper, which describes the approach we will use for map sharing and integration. 
+### Wiki
+Details is here: [wiki](https://github.com/SynergicRobotics/CollabNav/wiki)
 
 
 ### How to clone the repository?
