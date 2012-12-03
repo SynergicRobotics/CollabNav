@@ -26,7 +26,6 @@ installed:
 	cp $(SOURCE_DIR)/scanmatcher/*.h include/gmapping/scanmatcher
 	cp $(SOURCE_DIR)/log/*.h include/gmapping/log
 	cp $(SOURCE_DIR)/grid/*.h include/gmapping/grid
-	touch installed
 
 clean:
 	-cd $(SOURCE_DIR) && make clean

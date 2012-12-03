@@ -133,10 +133,10 @@ inline bool GridSlamProcessor::resample(const double* plainReading, int adaptSiz
     std::cerr  << " Done" <<std::endl;
     
     //END: BUILDING TREE
-    std::cerr << "Deleting old particles..." ;
+    std::cerr << "Deleting old particles..." << std::endl;
     m_particles.clear();
     std::cerr << "Done" << std::endl;
-    std::cerr << "Copying Particles and  Registering  scans...";
+    std::cerr << "Copying Particles and  Registering  scans..." << std::endl;
     for (ParticleVector::iterator it=temp.begin(); it!=temp.end(); it++){
       it->setWeight(0);
       m_matcher.invalidateActiveArea();

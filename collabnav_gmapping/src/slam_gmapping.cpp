@@ -218,6 +218,8 @@ SlamGMapping::SlamGMapping():
   if(!private_nh_.getParam("lasamplestep", lasamplestep_))
     lasamplestep_ = 0.005;
 
+  initial_ = false;
+  
   entropy_publisher_ = private_nh_.advertise<std_msgs::Float64>("entropy", 1, true);
   sst_ = node_.advertise<nav_msgs::OccupancyGrid>("map", 1, true);
   sstm_ = node_.advertise<nav_msgs::MapMetaData>("map_metadata", 1, true);
@@ -227,6 +229,7 @@ SlamGMapping::SlamGMapping():
   scan_filter_->registerCallback(boost::bind(&SlamGMapping::laserCallback, this, _1));
 
   particlecloud_pub_ = node_.advertise<geometry_msgs::PoseArray>("particlecloud", 2);
+  marker_pub_ = node_.advertise<visualization_msgs::Marker>("visualization_marker", 1);
 
   transform_thread_ = new boost::thread(boost::bind(&SlamGMapping::publishLoop, this, transform_publish_period));
   test_thread_ = new boost::thread(boost::bind(&SlamGMapping::test, this, 0.0));
@@ -240,7 +243,7 @@ void SlamGMapping::publishLoop(double transform_publish_period){
   ros::Rate r(1.0 / transform_publish_period);
   while(ros::ok()){
     publishTransform();
-    publishParticles();
+    publishModel();
     r.sleep();
   }
 }
@@ -459,10 +462,12 @@ SlamGMapping::addScan(const sensor_msgs::LaserScan& scan, const GMapping::Orient
             gmap_pose.theta);
             */
 
-  return gsp_->processScan(reading);
+  bool result = gsp_->processScan(reading, 0, initial_);
+  initial_ = false;
+  return result;
 }
 
-void SlamGMapping::publishParticles(double arg)
+void SlamGMapping::publishParticles()
 {
     GMapping::GridSlamProcessor::ParticleVector particles = gsp_->getParticles();
     int size = particles.size();
@@ -482,6 +487,74 @@ void SlamGMapping::publishParticles(double arg)
 
     particlecloud_pub_.publish(cloud_msg);
 }
+
+void SlamGMapping::publishModel()
+{
+    // If there are not yet any particles, stop
+    if (gsp_->getParticles().size() == 0) return;
+  
+// If the robot is physically travelling, update its marker
+    // Publish a marker 
+    visualization_msgs::Marker marker;
+    // Set the frame ID and timestamp.  See the TF tutorials for information on these.
+    marker.header.frame_id = "/odom";
+    marker.header.stamp = ros::Time::now();
+
+    // Set the namespace and id for this marker.  This serves to create a unique ID
+    // Any marker sent with the same namespace and id will overwrite the old one
+    marker.ns = "basic_shapes";
+    if (!isVirtual_)
+      marker.id = 0;
+    else
+      marker.id = 1;
+    
+    // Set the marker type.  Initially this is CUBE, and cycles between that and SPHERE, ARROW, and CYLINDER
+    marker.type = visualization_msgs::Marker::CYLINDER;
+
+    // Set the marker action.  Options are ADD and DELETE
+    marker.action = visualization_msgs::Marker::ADD;
+
+    GMapping::OrientedPoint bestPose = gsp_->getParticles()[gsp_->getBestParticleIndex()].pose;
+    
+    // Set the pose of the marker.  This is a full 6DOF pose relative to the frame/time specified in the header
+    marker.pose.position.x = bestPose.x;
+    marker.pose.position.y = bestPose.y;
+    marker.pose.position.z = 0;
+    
+    tf::Quaternion bestPoseQuaternion = tf::createQuaternionFromYaw(bestPose.theta);
+    
+    marker.pose.orientation.x = bestPoseQuaternion.x();
+    marker.pose.orientation.y = bestPoseQuaternion.y();
+    marker.pose.orientation.z = bestPoseQuaternion.z();
+    marker.pose.orientation.w = bestPoseQuaternion.w();
+
+    // Set the scale of the marker -- 1x1x1 here means 1m on a side
+    marker.scale.x = 0.5;
+    marker.scale.y = 0.5;
+    marker.scale.z = 0.5;
+
+    // Set the color -- be sure to set alpha to something non-zero!
+    if (!isVirtual_) {
+      marker.color.r = 0.0f;
+      marker.color.g = 1.0f;
+      marker.color.b = 0.0f;
+      marker.color.a = 1.0;
+    }
+    else {
+      // If we are virtual, we are ghost (transparent)
+      marker.color.r = 0.0f;
+      marker.color.g = 0.3f;
+      marker.color.b = 0.0f;
+      marker.color.a = 0.5;
+    }
+
+    marker.lifetime = ros::Duration();
+
+    // Publish the marker
+    marker_pub_.publish(marker);
+}
+
+
 
 void
 SlamGMapping::laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
@@ -524,7 +597,7 @@ SlamGMapping::laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
       ROS_ERROR("Transform from base_link to odom failed\n");
       odom_to_map.setIdentity();
     }
-
+    
     map_to_odom_mutex_.lock();
     map_to_odom_ = tf::Transform(tf::Quaternion( odom_to_map.getRotation() ),
                                  tf::Point(      odom_to_map.getOrigin() ) ).inverse();
@@ -536,8 +609,12 @@ SlamGMapping::laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
       last_map_update = scan->header.stamp;
       ROS_DEBUG("Updated the map");
     }
+  } else {
+//     out_ << false << endl;
   }
-//   Record(mpose, *scan).serialize(out_);
+  publishParticles();
+//   Record(gsp_->getParticles()[gsp_->getBestParticleIndex()].pose, *scan).serialize(out_);
+//   Record(odom_pose, *scan).serialize(out_);
 }
 
 double
@@ -702,7 +779,7 @@ void SlamGMapping::publishTransform()
   map_to_odom_mutex_.unlock();
 }
 
-void SlamGMapping::virtualLaserCallback(const Record& teammate_record)
+void SlamGMapping::virtualLaserCallback(const Record& teammate_record, bool isTransform, const TransformPair &transform)
 {
   static ros::Time last_map_update(0,0);
   
@@ -715,15 +792,15 @@ void SlamGMapping::virtualLaserCallback(const Record& teammate_record)
     ROS_DEBUG("new best pose: %.3f %.3f %.3f", mpose.x, mpose.y, mpose.theta);
 
     // Reversed time!
-    //if ((teammate_record.measurement_.header.stamp - last_map_update) > map_update_interval_) 
+    if ((teammate_record.measurement_.header.stamp - last_map_update) > map_update_interval_ || 
+	(last_map_update - teammate_record.measurement_.header.stamp) > map_update_interval_) 
     {
       updateMap(teammate_record.measurement_);
       last_map_update = teammate_record.measurement_.header.stamp;
       ROS_WARN("Updated the map using virtual data");
     }
-    
-    publishParticles();
   }
+  publishParticles();
 }
 
 void SlamGMapping::jump(const GMapping::OrientedPoint &robotPose,
@@ -732,7 +809,7 @@ void SlamGMapping::jump(const GMapping::OrientedPoint &robotPose,
   double dx = otherRobotPose.x - robotPose.x;
   double dy = otherRobotPose.y - robotPose.y;
   double range = sqrt(dx*dx + dy*dy);
-  double bearing = atan2(dy, dx) + robotPose.theta;
+  double bearing = atan2(dy, dx) - robotPose.theta;
   double otherRobotBearing = atan2(-dy, -dx) - otherRobotPose.theta;
 //   cout << "  RANGE, BEARING, OTHERROBOTBEARING = " << range << " " << bearing << " " << otherRobotBearing << endl;
 //   gsp_->save_particles("particleBeforeJump.txt");
@@ -746,32 +823,53 @@ void SlamGMapping::jump(const GMapping::OrientedPoint &robotPose,
 
 void SlamGMapping::rendezvous(const GMapping::OrientedPoint &robotPose,
                               const GMapping::OrientedPoint &otherRobotPose,
-                              const list<Record> &records)
+                              const list<Record> &records,
+			      const list<pair<bool, TransformPair> > &transforms)
 {
   // jump step
+  cout << "ROBOT POSITION : \n\t" << robotPose.x << "\t" << robotPose.y << "\t" << robotPose.theta << endl;
+  cout << "OTHER ROBOT POSITION : \n\t" << otherRobotPose.x << "\t" << otherRobotPose.y << "\t" << otherRobotPose.theta << endl;
   jump(robotPose, otherRobotPose);
 
   // virtual navigation starts here
-  for(list<Record>::const_iterator it = records.begin(); it != records.end(); ++it){
-    virtualLaserCallback(*it);
+  list<pair<bool, TransformPair> >::const_iterator transformItr = transforms.begin();
+  
+  list<Record>::const_reverse_iterator rit;
+  list<Record>::const_iterator it = records.begin();
+  for(rit = records.rbegin(); rit != records.rend(); ++it, ++transformItr, ++rit){
+    virtualLaserCallback(*it, transformItr->first, transformItr->second);
   }
 
   // move the robot back to the real physical location
+  gsp_->save_particles("particleBeforeTeleport.txt");
   gsp_->teleport();
+  gsp_->save_particles("particleAfterTeleport.txt");
   cout << "Virtual navigation has ended" << endl;
   cout << "\n  Complete Rendezvous Event!!" << endl << endl;
 }
 
-
-void SlamGMapping::readRecords(const string &filename, list<Record> &records)
+// TODO We don't need the transforms, revert it back to normal
+void SlamGMapping::readRecords(const string &filename, list<Record> &records, list<pair<bool, pair<btVector3, btQuaternion> > > & transforms, bool x)
 {
   ifstream in;
 
   in.open(filename.c_str(), ifstream::in);
   while (!in.eof()) {
+      if (x) {
+        bool isTransformAvailable;
+        in >> isTransformAvailable;
+        if (isTransformAvailable) {
+            float x,y,z,x0,y0,z0,w0;
+            in >> x >> y >> z >> x0 >> y0 >> z0 >> w0;
+            transforms.push_back(pair<bool, pair<btVector3, btQuaternion> > (true, pair<btVector3, btQuaternion>(btVector3(x,y,z),btQuaternion(x0,y0,z0,w0))));
+            cout << "************** WHAT IS GOING ON HERE " << endl;
+        } else {
+            transforms.push_back(pair<bool, pair<btVector3, btQuaternion> > (false, pair<btVector3, btQuaternion>(btVector3(0,0,0),btQuaternion(0,0,0,0))));
+        }
+      }
+    
     Record r;
     r.deserialize(in);
-//     r.measurement_.header.stamp = ros::Time::now();     //over write the timestamp
     records.push_back(r);
   }
   records.pop_back();    // delete last elem. TODO: fix deserialize
@@ -782,42 +880,37 @@ void SlamGMapping::test(double arg)
   //this is simulated information from robot sensor (not rendezvous)
   //this call is blocking
   cout << "Start physical navigation" << endl;
+  
+  isVirtual_ = false;
+  out_.open("records_01_odom.txt", ofstream::out);
   system("rosbag play --clock -r 3 ../01.bag");
-  cout << "Physical navigation has ended" << endl;
-
+  out_.close();
+  
     // First rendezvous
-  tf::Quaternion orientation01(-0.00625073, 0.00978491, 0.042442, 0.999031);
-  tf::Quaternion orientation02(-0.00872674, 0.00993745, -0.0376415, 0.999204);
-  GMapping::OrientedPoint robotPose01(0.27107, 2.35659, tf::getYaw(orientation01));
-  GMapping::OrientedPoint robotPose02(1.04821, 2.38144, tf::getYaw(orientation02));
+  GMapping::OrientedPoint robotPose01(1.26988, 2.10299, -0.020148);
+  GMapping::OrientedPoint robotPose02(1.27466, 2.08516, -0.0191652);
 
+  isVirtual_ = true;
   list<Record> records02;
-  readRecords("../records_02_full.txt", records02);
-  rendezvous(robotPose01, robotPose02, records02);
+  list<pair<bool, TransformPair> > transforms;
+  readRecords("../records_02_odom.txt", records02, transforms, false);
+  rendezvous(robotPose01, robotPose02, records02, transforms);
   
-//   cout << "Start physical navigation" << endl;
-//   system("rosbag play --clock -r 1 ../01_cont.bag");
-//   cout << "Physical navigation has ended" << endl; 
-//   
-//   tf::Quaternion orientationAfter01(-0.00985561, 0.00566173, 0.148382, 0.988865);
-//   GMapping::OrientedPoint robotPoseAfter01(-1.40518, 2.13106, tf::getYaw(orientationAfter01));
-//   jump(robotPose01, robotPoseAfter01);
+  publishParticles();
+  initial_ = true;
   
-  // Second rendezvous
-  cout << "Start physical navigation" << endl;
+  isVirtual_ = false;
   system("rosbag play --clock -r 3 ../03.bag");
-  cout << "Physical navigation has ended" << endl;
-  
+
   tf::Quaternion orientation03(-0.00734467, 0.00840551, 0.11665, 0.99311);
   tf::Quaternion orientation04(-0.00466876, 0.00981489, -0.00113311, 0.99994);
   GMapping::OrientedPoint robotPose03(-1.04777, 6.8536, tf::getYaw(orientation03));
   GMapping::OrientedPoint robotPose04(-0.24953, 6.93929, tf::getYaw(orientation04));
-
+  
+  isVirtual_ = true;
   list<Record> records04;
-  readRecords("../records_04_full.txt", records04);
-  rendezvous(robotPose03, robotPose04, records04);
+  readRecords("../records_04_odom.txt", records04, transforms, false);
+  rendezvous(robotPose03, robotPose04, records04, transforms);
 
-
-  out_.close();
 }
 

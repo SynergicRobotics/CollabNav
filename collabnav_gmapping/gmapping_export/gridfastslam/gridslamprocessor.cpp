@@ -313,7 +313,7 @@ void GridSlamProcessor::setMotionModelParameters
   }
   
   
-  bool GridSlamProcessor::processScan(const RangeReading & reading, int adaptParticles){
+  bool GridSlamProcessor::processScan(const RangeReading & reading, int adaptParticles, bool initial){
     
     /**retireve the position from the reading, and compute the odometry*/
     OrientedPoint relPose=reading.getPose();
@@ -321,10 +321,15 @@ void GridSlamProcessor::setMotionModelParameters
       m_lastPartPose=m_odoPose=relPose;
     }
     
+//     OrientedPoint pose(m_particles()[getBestParticleIndex()].pose);
     //write the state of the reading and update all the particles using the motion model
     for (ParticleVector::iterator it=m_particles.begin(); it!=m_particles.end(); it++){
       OrientedPoint& pose(it->pose);
-      pose=m_motionModel.drawFromMotion(it->pose, relPose, m_odoPose);
+      if (initial) {
+        pose=m_motionModel.drawFromMotion(it->pose, relPose, relPose);
+      } else {
+        pose=m_motionModel.drawFromMotion(it->pose, relPose, m_odoPose);
+      }
     }
 
     // update the output file
@@ -574,8 +579,8 @@ void GridSlamProcessor::setMotionModelParameters
       mean.x += range*cos(bearing + mean.theta);
       mean.y += range*sin(bearing + mean.theta);
       mean.theta += M_PI + bearing - otherRobotBearing;
-      it->pose = mean;
-//       it->pose = drawFromMVGaussian(mean, P);      
+//       it->pose = mean;
+      it->pose = drawFromMVGaussian(mean, P);      
     }
   }
 
@@ -583,8 +588,9 @@ void GridSlamProcessor::setMotionModelParameters
     cout << "Teleporting now!" << endl;
     //move every particles back to its saved position at Rendezvous event
     for (ParticleVector::iterator it=m_particles.begin(); it!=m_particles.end(); it++){
-      OrientedPoint& pose(it->pose);
-      pose=it->poseAtRendezvous;
+      it->pose.x=it->poseAtRendezvous.x;
+      it->pose.y=it->poseAtRendezvous.y;
+      it->pose.theta = it->poseAtRendezvous.theta;
     }
   }
 

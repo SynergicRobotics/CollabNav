@@ -163,7 +163,7 @@ namespace GMapping {
     
     //the "core" algorithm
     void processTruePos(const OdometryReading& odometry);
-    bool processScan(const RangeReading & reading, int adaptParticles=0);
+    bool processScan(const RangeReading & reading, int adaptParticles=0, bool initial = false);
     
     /**This method copies the state of the filter in a tree.
      The tree is represented through reversed pointers (each node has a pointer to its parent).

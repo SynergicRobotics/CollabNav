@@ -39,6 +39,7 @@
 
 #include <fstream>
 #include <cmath>
+#include <visualization_msgs/Marker.h>
 
 #define foreach BOOST_FOREACH
 
@@ -152,6 +153,8 @@
  */
 
 using namespace std;
+
+typedef pair<btVector3, btQuaternion> TransformPair;
    
 //CollabNav
 class Record{
@@ -250,9 +253,9 @@ class SlamGMapping
     bool mapCallback(nav_msgs::GetMap::Request  &req,
                      nav_msgs::GetMap::Response &res);
     void publishLoop(double transform_publish_period);
-    void virtualLaserCallback(const Record &teammate_record);
+    void virtualLaserCallback(const Record &teammate_record, bool isTransform, const TransformPair &transform);
 
-    void publishParticles(double arg =.0);
+    void publishParticles();
     
     // Jump step
     void jump(const GMapping::OrientedPoint &robotPose,
@@ -261,10 +264,11 @@ class SlamGMapping
     // Performs rendezvous event
     void rendezvous(const GMapping::OrientedPoint &robotPose,
                     const GMapping::OrientedPoint &otherRobotPose,
-                    const list<Record> &records);
+                    const list<Record> &records,
+		    const list<pair<bool, TransformPair> > &transforms);
 
     // Read records from a file
-    void readRecords(const string &filename, list<Record> &records);
+    void readRecords(const string &filename, list<Record> &records, list<pair<bool, pair<btVector3, btQuaternion> > > & transforms, bool x);
 
 
   private:
@@ -278,7 +282,6 @@ class SlamGMapping
     message_filters::Subscriber<sensor_msgs::LaserScan>* scan_filter_sub_;
     tf::MessageFilter<sensor_msgs::LaserScan>* scan_filter_;
     tf::TransformBroadcaster* tfB_;
-    ros::Publisher particlecloud_pub_;
 
     // OpenSLAM GMapping stuff
     GMapping::GridSlamProcessor* gsp_;
@@ -352,8 +355,13 @@ class SlamGMapping
     ros::Subscriber rndvSubscriber_;
     boost::thread* test_thread_;
     list<Record> virtualRecords_;
-    void test(double arg);
+    ros::Publisher particlecloud_pub_;
+    boost::mutex mutex_particlecloud_;
+    bool initial_;
+    bool isVirtual_;
+    ros::Publisher marker_pub_;
+    ofstream out_;
     
-    ofstream out_; 
-    ifstream in_;
+    void test(double arg);
+    void publishModel();
 };
